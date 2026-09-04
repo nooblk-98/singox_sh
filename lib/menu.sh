@@ -36,7 +36,11 @@ ask() {
   fi
 }
 
-port_free() { ! ss -tuln 2>/dev/null | awk '{print $5}' | grep -qE "[:.]$1\$"; }
+port_free() {
+  local port="$1" net="${2:-tcp}" flag="-tln"
+  [ "$net" = "udp" ] && flag="-uln"
+  ! ss $flag 2>/dev/null | awk '{print $5}' | grep -qE "[:.]${port}\$"
+}
 
 ensure_clash_api() {
   if jq -e '.experimental.clash_api' "$CONF" >/dev/null 2>&1; then
@@ -98,16 +102,23 @@ cert_expiry_line() {
 }
 
 ask_port() {
-  local default="${1:-}" p
+  # $2 = network family this inbound will use: "tcp" (default) or "udp".
+  # TCP and UDP are independent socket namespaces, so the same port number
+  # can be reused across them (e.g. a TCP Reality inbound and a UDP
+  # Hysteria2/TUIC inbound can both sit on port 443).
+  local default="${1:-}" net="${2:-tcp}" p
   while true; do
     p=$(ask "Port" "$default")
     [[ "$p" =~ ^[0-9]+$ ]] && [ "$p" -ge 1 ] && [ "$p" -le 65535 ] || { warn "Invalid port."; continue; }
-    if jq -e --argjson p "$p" '.inbounds[] | select(.listen_port==$p)' "$CONF" >/dev/null 2>&1; then
-      warn "Port $p already used by an existing inbound."
+    if jq -e --argjson p "$p" --arg net "$net" '
+        .inbounds[] | select(.listen_port==$p) |
+        select((if (.type=="hysteria2" or .type=="tuic") then "udp" else "tcp" end) == $net)
+      ' "$CONF" >/dev/null 2>&1; then
+      warn "Port $p/$net already used by an existing inbound."
       continue
     fi
-    if ! port_free "$p"; then
-      warn "Port $p appears to be in use on the system."
+    if ! port_free "$p" "$net"; then
+      warn "Port $p/$net appears to be in use on the system."
       [ "$(ask "Use it anyway? (y/N)" "n")" = "y" ] && { echo "$p"; return; } || continue
     fi
     echo "$p"; return
@@ -419,7 +430,7 @@ add_shadowsocks() {
 }
 
 add_hysteria2() {
-  local port; port=$(ask_port)
+  local port; port=$(ask_port "" udp)
   local domain; domain=$(ask "Certificate domain")
   ensure_cert "$domain" || return
   local password; password=$(gen_b64 16)
@@ -444,7 +455,7 @@ add_hysteria2() {
 }
 
 add_tuic() {
-  local port; port=$(ask_port)
+  local port; port=$(ask_port "" udp)
   local domain; domain=$(ask "Certificate domain")
   ensure_cert "$domain" || return
   local uuid; uuid=$(gen_uuid)
