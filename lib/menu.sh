@@ -282,6 +282,28 @@ add_vless_ws_tls() {
   [ "$sni" != "$domain" ] && warn "SNI differs from cert domain - client must set verifyPeerCertByName=$domain (Xray) or the equivalent for its core, since allowInsecure is removed in modern Xray."
 }
 
+add_vless_raw_tls() {
+  local port; port=$(ask_port)
+  local domain; domain=$(ask "Certificate domain (real domain with a valid cert)")
+  ensure_cert "$domain" || return
+  local sni; sni=$(ask "SNI to present to clients (decoy domain, e.g. m.youtube.com; blank = same as cert domain)" "$domain")
+  local uuid; uuid=$(gen_uuid)
+  local tag="vless-tcp-tls-$port"
+  local certdir="$CERT_BASE/$domain"
+  local inbound
+  inbound=$(jq -n --arg tag "$tag" --argjson port "$port" --arg uuid "$uuid" \
+    --arg sni "$sni" --arg cert "$certdir/fullchain.pem" --arg key "$certdir/privkey.pem" '
+    {type:"vless",tag:$tag,listen:"::",listen_port:$port,tcp_fast_open:true,
+     users:[{uuid:$uuid,flow:""}],
+     tls:{enabled:true,server_name:$sni,min_version:"1.2",max_version:"1.3",certificate_path:$cert,key_path:$key}}')
+  jq --argjson nb "$inbound" '.inbounds += [$nb]' "$CONF" > /tmp/singbox_new.json
+  validate_and_apply /tmp/singbox_new.json || return
+  local addr; addr=$(get_address)
+  local uri="vless://${uuid}@${addr}:${port}?type=tcp&security=tls&sni=${sni}&fp=chrome#${tag}"
+  save_link "$tag" "$uri"
+  [ "$sni" != "$domain" ] && warn "SNI differs from cert domain - client must set verifyPeerCertByName=$domain (Xray) or use the sing-box core, whose native insecure flag handles this without that workaround."
+}
+
 add_vless_transport_tls() {  # grpc / httpupgrade, shared shape
   local transport="$1" label="$2"
   local port; port=$(ask_port)
@@ -481,27 +503,29 @@ add_inbound_menu() {
   echo "  1) VLESS + WS + TLS            (CDN-friendly camouflage)"
   echo "  2) VLESS + gRPC + TLS"
   echo "  3) VLESS + HTTPUpgrade + TLS"
-  echo "  4) VLESS + Reality + Vision     (fastest in our benchmarks, no cert needed)"
-  echo "  5) VLESS + Reality (no Vision, less padding overhead)"
-  echo "  6) VMess + WS + TLS"
-  echo "  7) Trojan + TLS (raw)"
-  echo "  8) Trojan + WS + TLS"
-  echo "  9) Shadowsocks (2022 / classic AEAD)"
-  echo " 10) Hysteria2 (QUIC/UDP)"
-  echo " 11) TUIC v5 (QUIC/UDP)"
+  echo "  4) VLESS + TCP (raw) + TLS      (plain TLS, no WS framing)"
+  echo "  5) VLESS + Reality + Vision     (fastest in our benchmarks, no cert needed)"
+  echo "  6) VLESS + Reality (no Vision, less padding overhead)"
+  echo "  7) VMess + WS + TLS"
+  echo "  8) Trojan + TLS (raw)"
+  echo "  9) Trojan + WS + TLS"
+  echo " 10) Shadowsocks (2022 / classic AEAD)"
+  echo " 11) Hysteria2 (QUIC/UDP)"
+  echo " 12) TUIC v5 (QUIC/UDP)"
   echo "  0) Back"
   case "$(ask "Choose" "0")" in
     1) add_vless_ws_tls ;;
     2) add_vless_transport_tls grpc "gRPC" ;;
     3) add_vless_transport_tls httpupgrade "HTTPUpgrade" ;;
-    4) add_vless_reality y ;;
-    5) add_vless_reality n ;;
-    6) add_vmess_ws_tls ;;
-    7) add_trojan n ;;
-    8) add_trojan y ;;
-    9) add_shadowsocks ;;
-    10) add_hysteria2 ;;
-    11) add_tuic ;;
+    4) add_vless_raw_tls ;;
+    5) add_vless_reality y ;;
+    6) add_vless_reality n ;;
+    7) add_vmess_ws_tls ;;
+    8) add_trojan n ;;
+    9) add_trojan y ;;
+    10) add_shadowsocks ;;
+    11) add_hysteria2 ;;
+    12) add_tuic ;;
     0) return ;;
     *) warn "Invalid choice." ;;
   esac
