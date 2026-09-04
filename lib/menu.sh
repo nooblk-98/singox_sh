@@ -37,6 +37,19 @@ ask() {
 
 port_free() { ! ss -tuln 2>/dev/null | awk '{print $5}' | grep -qE "[:.]$1\$"; }
 
+cert_expiry_line() {
+  # Prints "<enddate>|<days>" for a valid cert, or "INVALID|" for an
+  # unreadable/empty one (e.g. a failed acme.sh issuance).
+  local f="$1" enddate
+  enddate=$(openssl x509 -enddate -noout -in "$f" 2>/dev/null | cut -d= -f2)
+  if [ -z "$enddate" ]; then
+    echo "INVALID|"
+    return
+  fi
+  local days=$(( ( $(date -d "$enddate" +%s) - $(date +%s) ) / 86400 ))
+  echo "${enddate}|${days}"
+}
+
 ask_port() {
   local default="${1:-}" p
   while true; do
@@ -91,8 +104,7 @@ validate_and_apply() {
 # ---------- certificates ----------
 
 decode_reload_hook() {
-  local domain="$1" conf="$CERT_BASE/../.acme.sh/${domain}_ecc/${domain}.conf"
-  conf="/root/.acme.sh/${domain}_ecc/${domain}.conf"
+  local domain="$1" conf="/root/.acme.sh/${domain}_ecc/${domain}.conf"
   [ -f "$conf" ] || { echo ""; return; }
   grep Le_ReloadCmd "$conf" 2>/dev/null | sed 's/.*START_//;s/__ACME.*//' | base64 -d 2>/dev/null
 }
@@ -133,9 +145,13 @@ cert_menu() {
     if compgen -G "$CERT_BASE/*/fullchain.pem" >/dev/null; then
       for f in "$CERT_BASE"/*/fullchain.pem; do
         local domain; domain=$(basename "$(dirname "$f")")
-        local enddate days hookstatus
-        enddate=$(openssl x509 -enddate -noout -in "$f" 2>/dev/null | cut -d= -f2)
-        days=$(( ( $(date -d "$enddate" +%s 2>/dev/null || echo 0) - $(date +%s) ) / 86400 ))
+        local line enddate days hookstatus
+        line=$(cert_expiry_line "$f")
+        enddate="${line%%|*}"; days="${line##*|}"
+        if [ "$enddate" = "INVALID" ]; then
+          printf "  %-30s ${c_r}INVALID/EMPTY cert - issuance likely failed${c_0}\n" "$domain"
+          continue
+        fi
         hookstatus="OK"
         [ "$(decode_reload_hook "$domain")" = "systemctl restart $SERVICE" ] || hookstatus="MISMATCH"
         printf "  %-30s expires %s (%s days)  reload-hook:%s\n" "$domain" "$enddate" "$days" "$hookstatus"
@@ -488,19 +504,20 @@ status_dashboard() {
   echo "Version:      $("$BIN" version 2>/dev/null | head -1)"
   echo "Uptime:       $(systemctl show -p ActiveEnterTimestamp "$SERVICE" 2>/dev/null | cut -d= -f2)"
   echo "Address:      $(get_address)"
-  echo ""
-  echo "Listening ports:"
-  ss -tuln 2>/dev/null | awk 'NR==1 || /LISTEN|UNCONN/' | grep -E ":($(jq -r '[.inbounds[].listen_port] | join("|")' "$CONF" 2>/dev/null))\b" || echo "  (none)"
-  list_inbounds
+  echo "Inbounds:     $(jq '.inbounds | length' "$CONF" 2>/dev/null) (menu option 2 for details)"
   echo ""
   echo "Certificates:"
   if compgen -G "$CERT_BASE/*/fullchain.pem" >/dev/null; then
     for f in "$CERT_BASE"/*/fullchain.pem; do
-      local domain enddate days
+      local domain line enddate days
       domain=$(basename "$(dirname "$f")")
-      enddate=$(openssl x509 -enddate -noout -in "$f" 2>/dev/null | cut -d= -f2)
-      days=$(( ( $(date -d "$enddate" +%s 2>/dev/null || echo 0) - $(date +%s) ) / 86400 ))
-      echo "  $domain: $days days left"
+      line=$(cert_expiry_line "$f")
+      enddate="${line%%|*}"; days="${line##*|}"
+      if [ "$enddate" = "INVALID" ]; then
+        echo -e "  $domain: ${c_r}INVALID/EMPTY cert${c_0}"
+      else
+        echo "  $domain: $days days left"
+      fi
     done
   else
     echo "  (none)"
@@ -551,9 +568,11 @@ uninstall_all() {
 
 main_menu() {
   while true; do
+    clear 2>/dev/null || true
+    status_dashboard
     echo ""
     echo -e "${c_b}=== singox_sh manager ===${c_0}"
-    echo " 1) Status dashboard"
+    echo " 1) Refresh"
     echo " 2) List inbounds"
     echo " 3) Add inbound"
     echo " 4) Remove inbound"
@@ -567,7 +586,7 @@ main_menu() {
     echo "12) Uninstall"
     echo " 0) Exit"
     case "$(ask "Choose" "1")" in
-      1) status_dashboard; pause ;;
+      1) : ;;
       2) list_inbounds; pause ;;
       3) add_inbound_menu ;;
       4) remove_inbound; pause ;;
