@@ -441,10 +441,24 @@ list_inbounds() {
 }
 
 remove_inbound() {
-  list_inbounds
-  local tags; tags=$(jq -r '.inbounds[].tag' "$CONF" 2>/dev/null)
-  [ -z "$tags" ] && { warn "No inbounds to remove."; return; }
-  local tag; tag=$(ask "Tag to remove (exact)")
+  local tags=(); while IFS= read -r t; do tags+=("$t"); done < <(jq -r '.inbounds[].tag' "$CONF" 2>/dev/null)
+  [ "${#tags[@]}" -eq 0 ] && { warn "No inbounds to remove."; return; }
+  echo ""
+  echo "== Inbounds =="
+  local i=1 t type port
+  for t in "${tags[@]}"; do
+    type=$(jq -r --arg t "$t" '.inbounds[] | select(.tag==$t) | .type' "$CONF")
+    port=$(jq -r --arg t "$t" '.inbounds[] | select(.tag==$t) | .listen_port' "$CONF")
+    printf "  %d) %-30s %-12s port %s\n" "$i" "$t" "$type" "$port"
+    i=$((i+1))
+  done
+  local sel tag
+  sel=$(ask "Number to remove (or type exact tag)")
+  if [[ "$sel" =~ ^[0-9]+$ ]] && [ "$sel" -ge 1 ] && [ "$sel" -le "${#tags[@]}" ]; then
+    tag="${tags[$((sel-1))]}"
+  else
+    tag="$sel"
+  fi
   jq -e --arg t "$tag" '.inbounds[] | select(.tag==$t)' "$CONF" >/dev/null 2>&1 || { err "No such tag."; return; }
   jq --arg t "$tag" '.inbounds |= map(select(.tag != $t))' "$CONF" > /tmp/singbox_new.json
   validate_and_apply /tmp/singbox_new.json || return
