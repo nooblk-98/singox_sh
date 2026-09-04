@@ -6,16 +6,22 @@ Built from a real deployment (`xray2.itsnooblk.com`) — see the companion Trili
 
 ## Install on a fresh Ubuntu/Debian VPS
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/nooblk-98/singox_sh/main/install.sh | sudo bash
-```
-
-or clone and run locally:
+This repo is **private**, so `curl | bash` from raw.githubusercontent.com won't work (private repos aren't served there without auth). Clone it with an authenticated method instead:
 
 ```sh
-git clone https://github.com/nooblk-98/singox_sh.git
+# using the GitHub CLI (if the target server has `gh auth login` set up)
+gh repo clone nooblk-98/singox_sh
 cd singox_sh
 sudo ./install.sh
+
+# or with a personal access token
+git clone https://<token>@github.com/nooblk-98/singox_sh.git
+cd singox_sh
+sudo ./install.sh
+
+# or just scp the folder over from a machine that already has it cloned
+scp -r ./singox_sh root@<new-server>:/root/
+ssh root@<new-server> 'cd /root/singox_sh && sudo ./install.sh'
 ```
 
 This installs sing-box (latest release), acme.sh, applies kernel network tuning (BBR + fq, TCP fastopen, larger buffers), sets up the systemd service, and installs the `singbox-menu` command.

@@ -18,7 +18,6 @@ CONF="/usr/local/etc/singbox-config.json"
 SERVICE_FILE="/etc/systemd/system/sing-box.service"
 SYSCTL_FILE="/etc/sysctl.d/99-network-tune.conf"
 MENU_LINK="/usr/local/bin/singbox-menu"
-REPO_RAW="https://raw.githubusercontent.com/nooblk-98/singox_sh/main"
 
 log()  { echo -e "\033[1;32m[+]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[!]\033[0m $*"; }
@@ -149,8 +148,9 @@ install_menu() {
   if [ -f "$(dirname "$0")/lib/menu.sh" ]; then
     cp "$(dirname "$0")/lib/menu.sh" "$APP_DIR/menu.sh"
   else
-    log "Fetching menu.sh from repo..."
-    curl -fsSL "$REPO_RAW/lib/menu.sh" -o "$APP_DIR/menu.sh"
+    die "lib/menu.sh not found next to install.sh. This repo is PRIVATE, so it must be" \
+        "'git clone'd (with an authenticated GitHub CLI/token/deploy key) rather than" \
+        "fetched via a public curl one-liner. Run: git clone https://github.com/nooblk-98/singox_sh.git && cd singox_sh && sudo ./install.sh"
   fi
   chmod +x "$APP_DIR/menu.sh"
   ln -sf "$APP_DIR/menu.sh" "$MENU_LINK"
