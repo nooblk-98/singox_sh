@@ -552,6 +552,16 @@ status_dashboard() {
   echo "Uptime:       $(systemctl show -p ActiveEnterTimestamp "$SERVICE" 2>/dev/null | cut -d= -f2)"
   echo "Address:      $(get_address)"
   echo "Inbounds:     $(jq '.inbounds | length' "$CONF" 2>/dev/null) (menu option 2 for details)"
+  if jq -e '.experimental.clash_api' "$CONF" >/dev/null 2>&1; then
+    local tj up down active
+    tj=$(curl -s --max-time 1 "http://${CLASH_API_ADDR}/connections")
+    if [ -n "$tj" ]; then
+      up=$(echo "$tj" | jq -r '.uploadTotal // 0')
+      down=$(echo "$tj" | jq -r '.downloadTotal // 0')
+      active=$(echo "$tj" | jq -r '.connections | length')
+      echo "Traffic:      up $(bytes_human "$up") / down $(bytes_human "$down")  (${active} active, since last restart)"
+    fi
+  fi
   echo ""
   echo "Certificates:"
   if compgen -G "$CERT_BASE/*/fullchain.pem" >/dev/null; then
