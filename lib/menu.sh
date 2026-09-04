@@ -12,6 +12,7 @@ CERT_BASE="/root/cert"
 ACME="/root/.acme.sh/acme.sh"
 ADDR_FILE="/usr/local/etc/singbox-address"
 LINKS_FILE="/usr/local/etc/singbox-links.txt"
+CLASH_API_ADDR="127.0.0.1:9090"
 BACKUP_DIR="/root/singbox-backups"
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root."; exit 1; }
@@ -36,6 +37,52 @@ ask() {
 }
 
 port_free() { ! ss -tuln 2>/dev/null | awk '{print $5}' | grep -qE "[:.]$1\$"; }
+
+ensure_clash_api() {
+  if jq -e '.experimental.clash_api' "$CONF" >/dev/null 2>&1; then
+    return 0
+  fi
+  log "Enabling sing-box's Clash API (needed for live traffic totals)..."
+  jq --arg addr "$CLASH_API_ADDR" \
+    '.experimental = {"clash_api": {"external_controller": $addr}, "cache_file": {"enabled": true}}' \
+    "$CONF" > /tmp/singbox_new.json
+  validate_and_apply /tmp/singbox_new.json
+}
+
+bytes_human() {
+  local b="$1"
+  awk -v b="$b" 'BEGIN {
+    split("B KB MB GB TB", u, " ");
+    i = 1;
+    while (b >= 1024 && i < 5) { b /= 1024; i++ }
+    printf "%.2f %s", b, u[i]
+  }'
+}
+
+show_traffic() {
+  ensure_clash_api || return
+  echo ""
+  echo "== Live traffic (since last sing-box restart) =="
+  local json; json=$(curl -s --max-time 3 "http://${CLASH_API_ADDR}/connections")
+  if [ -z "$json" ]; then
+    err "Could not reach Clash API at $CLASH_API_ADDR - is sing-box running?"
+    return
+  fi
+  local up down active
+  up=$(echo "$json" | jq -r '.uploadTotal // 0')
+  down=$(echo "$json" | jq -r '.downloadTotal // 0')
+  active=$(echo "$json" | jq -r '.connections | length')
+  echo "Upload total:    $(bytes_human "$up")"
+  echo "Download total:  $(bytes_human "$down")"
+  echo "Active connections: $active"
+  if [ "$active" -gt 0 ]; then
+    echo ""
+    echo "Active connections by inbound:"
+    echo "$json" | jq -r '.connections[].metadata.type' | sed 's#.*/##' | sort | uniq -c | sort -rn
+  fi
+  echo ""
+  warn "This counter resets whenever sing-box restarts (e.g. after adding/removing an inbound) - it's not persisted historical usage."
+}
 
 cert_expiry_line() {
   # Prints "<enddate>|<days>" for a valid cert, or "INVALID|" for an
@@ -583,7 +630,8 @@ main_menu() {
     echo " 9) View logs"
     echo "10) Backup config+certs now"
     echo "11) Restart service"
-    echo "12) Uninstall"
+    echo "12) Live traffic totals"
+    echo "13) Uninstall"
     echo " 0) Exit"
     case "$(ask "Choose" "1")" in
       1) : ;;
@@ -597,7 +645,8 @@ main_menu() {
       9) view_logs ;;
       10) backup_now; pause ;;
       11) systemctl restart "$SERVICE" && log "Restarted." || err "Restart failed."; pause ;;
-      12) uninstall_all ;;
+      12) show_traffic; pause ;;
+      13) uninstall_all ;;
       0) exit 0 ;;
       *) warn "Invalid choice." ;;
     esac
