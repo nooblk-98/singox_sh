@@ -32,31 +32,17 @@ Every inbound you add generates its own UUIDs, keys and passwords, validates aga
 
 ## Getting started
 
-> [!IMPORTANT]
-> This repository is **private**. A `curl | bash` from `raw.githubusercontent.com` will not work
-> because private repos aren't served there without auth. Clone it with an authenticated method.
-
 On a fresh server, as root:
 
 ```sh
-# with the GitHub CLI (server has `gh auth login` configured)
-gh repo clone nooblk-98/singox_sh
+git clone https://github.com/nooblk-98/singox_sh.git
 cd singox_sh
 sudo ./install.sh
 ```
 
-```sh
-# or with a personal access token
-git clone https://<token>@github.com/nooblk-98/singox_sh.git
-cd singox_sh
-sudo ./install.sh
-```
-
-```sh
-# or copy a working checkout over from another machine
-scp -r ./singox_sh root@<new-server>:/root/
-ssh root@<new-server> 'cd /root/singox_sh && sudo ./install.sh'
-```
+> [!NOTE]
+> The installer copies `lib/menu.sh` from the checkout, so clone the repo rather than piping a
+> single file. `gh repo clone nooblk-98/singox_sh` works too.
 
 The installer is **safe to re-run**: it never overwrites an existing config, it only refreshes the
 binary, service, and menu tool.
