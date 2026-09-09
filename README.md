@@ -5,7 +5,7 @@
 **One-shot installer and interactive manager for a [sing-box](https://sing-box.sagernet.org/) proxy relay server.**
 
 Bootstraps sing-box, issues TLS certificates, tunes the kernel for throughput, and gives you a
-menu to add protocols and hand out ready-to-import client links — no hand-editing JSON.
+menu to add protocols and hand out ready-to-import client links, with no hand-editing of JSON.
 
 </div>
 
@@ -21,12 +21,12 @@ Every inbound you add generates its own UUIDs, keys and passwords, validates aga
 
 ## Features
 
-- **12 inbound types** from a single menu — VLESS (WS / gRPC / HTTPUpgrade / raw TCP / Reality / Reality+Vision), VMess+WS, Trojan (raw / WS), Shadowsocks (2022 AEAD or classic), Hysteria2, TUIC v5.
-- **Automatic TLS** via `acme.sh` standalone HTTP-01 — certificates are issued, installed, and wired to reload the service on renewal.
-- **Reload-hook verification** — the certificate view checks that each `acme.sh` renewal hook actually reloads *this* server's service, catching the classic "cert renews but the process never picks it up" failure.
-- **Safe config edits** — every change is checked against a temp file with `sing-box check`; a bad edit never reaches the live config, and the service is rolled forward only if it restarts cleanly.
-- **Fresh secrets per install** — nothing is hard-coded or shared between deployments.
-- **Kernel tuning** — BBR + `fq`, TCP Fast Open, MTU probing, and larger buffers written to `/etc/sysctl.d/99-network-tune.conf`.
+- **12 inbound types** from a single menu: VLESS (WS / gRPC / HTTPUpgrade / raw TCP / Reality / Reality+Vision), VMess+WS, Trojan (raw / WS), Shadowsocks (2022 AEAD or classic), Hysteria2, TUIC v5.
+- **Automatic TLS** via `acme.sh` standalone HTTP-01. Certificates are issued, installed, and wired to reload the service on renewal.
+- **Reload-hook verification**: the certificate view checks that each `acme.sh` renewal hook actually reloads *this* server's service, catching the classic "cert renews but the process never picks it up" failure.
+- **Safe config edits**: every change is checked against a temp file with `sing-box check`. A bad edit never reaches the live config, and the service is rolled forward only if it restarts cleanly.
+- **Fresh secrets per install**: nothing is hard-coded or shared between deployments.
+- **Kernel tuning**: BBR + `fq`, TCP Fast Open, MTU probing, and larger buffers written to `/etc/sysctl.d/99-network-tune.conf`.
 - **Live traffic totals** via sing-box's Clash API, plus a status dashboard, log viewer, and one-command backup of config + certs.
 - **Client links saved** to `/usr/local/etc/singbox-links.txt` and viewable any time from the menu.
 
@@ -72,16 +72,16 @@ singbox-menu
                                13) Uninstall
 ```
 
-**Adding an inbound** — pick a protocol and a port. UUID, keys, passwords and the TLS certificate
+**Adding an inbound**: pick a protocol and a port. UUID, keys, passwords and the TLS certificate
 (issued on the spot if missing) are all handled for you. The generated client link is printed and
 saved.
 
-**Certificates** — lists every issued cert with an expiry countdown and a reload-hook status
+**Certificates**: lists every issued cert with an expiry countdown and a reload-hook status
 (`OK` / `MISMATCH`), and can issue, force-renew, or repair hooks for one or all domains.
 
 > [!TIP]
 > For "SNI camouflage" setups where the SNI shown to clients differs from the real certificate
-> domain, the client must set `verifyPeerCertByName` to the real cert domain — modern Xray-core
+> domain, the client must set `verifyPeerCertByName` to the real cert domain. Modern Xray-core
 > removed `allowInsecure`. The menu warns you whenever you configure a mismatched SNI.
 
 ## What gets installed
@@ -89,7 +89,7 @@ saved.
 | Path | Purpose |
 | --- | --- |
 | `/usr/local/bin/sing-box` | sing-box binary (latest release) |
-| `/usr/local/etc/singbox-config.json` | Live configuration — never overwritten by the installer |
+| `/usr/local/etc/singbox-config.json` | Live configuration (never overwritten by the installer) |
 | `/etc/systemd/system/sing-box.service` | systemd unit (`sing-box run -c …`) |
 | `/etc/sysctl.d/99-network-tune.conf` | BBR + network tuning |
 | `/usr/local/lib/singox_sh/menu.sh` | Management menu (symlinked as `singbox-menu`) |
