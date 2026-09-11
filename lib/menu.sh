@@ -199,7 +199,7 @@ ensure_cert() {
 
 cert_menu() {
   while true; do
-    echo ""
+    clear 2>/dev/null || true
     echo "== Certificates =="
     if compgen -G "$CERT_BASE/*/fullchain.pem" >/dev/null; then
       for f in "$CERT_BASE"/*/fullchain.pem; do
@@ -260,7 +260,7 @@ save_link() {
 
 add_vless_ws_tls() {
   local port; port=$(ask_port)
-  local domain; domain=$(ask "Certificate domain (real domain with a valid cert)")
+  local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
   local sni; sni=$(ask "SNI to present to clients (decoy domain, e.g. m.youtube.com; blank = same as cert domain)" "$domain")
   local path; path=$(ask "WS path" "/$(gen_hex 6)")
@@ -285,7 +285,7 @@ add_vless_ws_tls() {
 
 add_vless_raw_tls() {
   local port; port=$(ask_port)
-  local domain; domain=$(ask "Certificate domain (real domain with a valid cert)")
+  local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
   local sni; sni=$(ask "SNI to present to clients (decoy domain, e.g. m.youtube.com; blank = same as cert domain)" "$domain")
   local uuid; uuid=$(gen_uuid)
@@ -308,7 +308,7 @@ add_vless_raw_tls() {
 add_vless_transport_tls() {  # grpc / httpupgrade, shared shape
   local transport="$1" label="$2"
   local port; port=$(ask_port)
-  local domain; domain=$(ask "Certificate domain (real domain with a valid cert)")
+  local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
   local sni; sni=$(ask "SNI to present to clients" "$domain")
   local uuid; uuid=$(gen_uuid)
@@ -370,7 +370,7 @@ add_vless_reality() {
 
 add_vmess_ws_tls() {
   local port; port=$(ask_port)
-  local domain; domain=$(ask "Certificate domain")
+  local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
   local sni; sni=$(ask "SNI to present to clients" "$domain")
   local path; path=$(ask "WS path" "/$(gen_hex 6)")
@@ -399,7 +399,7 @@ add_vmess_ws_tls() {
 add_trojan() {
   local with_ws="$1"  # y/n
   local port; port=$(ask_port)
-  local domain; domain=$(ask "Certificate domain")
+  local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
   local sni; sni=$(ask "SNI to present to clients" "$domain")
   local password; password=$(gen_b64 16)
@@ -454,7 +454,7 @@ add_shadowsocks() {
 
 add_hysteria2() {
   local port; port=$(ask_port "" udp)
-  local domain; domain=$(ask "Certificate domain")
+  local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
   local password; password=$(gen_b64 16)
   local masq; masq=$(ask "Masquerade URL (decoy site shown to probers)" "https://m.youtube.com")
@@ -479,7 +479,7 @@ add_hysteria2() {
 
 add_tuic() {
   local port; port=$(ask_port "" udp)
-  local domain; domain=$(ask "Certificate domain")
+  local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
   local uuid; uuid=$(gen_uuid)
   local password; password=$(gen_b64 16)
@@ -499,7 +499,7 @@ add_tuic() {
 }
 
 add_inbound_menu() {
-  echo ""
+  clear 2>/dev/null || true
   echo "== Add inbound - choose type =="
   echo "  1) VLESS + WS + TLS            (CDN-friendly camouflage)"
   echo "  2) VLESS + gRPC + TLS"
@@ -618,7 +618,7 @@ status_dashboard() {
 }
 
 kernel_tuning_menu() {
-  echo ""
+  clear 2>/dev/null || true
   echo "== Kernel / network tuning =="
   if [ -f "$SYSCTL_FILE" ]; then
     echo "File: $SYSCTL_FILE"
