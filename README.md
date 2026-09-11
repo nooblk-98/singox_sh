@@ -73,28 +73,13 @@ force-renew a domain on demand. Auto-renewal itself runs daily in the background
 
 Two independent things get updated automatically or on demand:
 
-- **singox_sh itself** — choose **Update singox_sh** (option 14) in the menu. It downloads the
+- **singox_sh itself**   choose **Update singox_sh** (option 14) in the menu. It downloads the
   latest release from GitHub and relaunches. You can also re-run the install one-liner above at
   any time; it's idempotent.
-- **Certificates** — a `singbox-renew.timer` installed alongside the tool checks daily and
+- **Certificates**   a `singbox-renew.timer` installed alongside the tool checks daily and
   renews anything nearing expiry, restarting sing-box once if anything actually renewed. Trigger
   it manually with `singbox-menu renew-all`.
 
-## What gets installed
-
-| Path | Purpose |
-| --- | --- |
-| `/usr/local/bin/sing-box` | sing-box binary (latest release) |
-| `/usr/local/bin/singbox-menu` | This tool — a single static binary |
-| `/usr/local/etc/singbox-config.json` | Live configuration (never overwritten by the installer) |
-| `/etc/systemd/system/sing-box.service` | systemd unit (`sing-box run -c …`) |
-| `/etc/systemd/system/singbox-renew.{service,timer}` | Daily certificate renewal |
-| `/etc/systemd/system/singbox-stats.{service,timer}` | Per-minute traffic totals collection |
-| `/etc/sysctl.d/99-network-tune.conf` | BBR + network tuning |
-| `/usr/local/etc/singbox.db` | Public address, saved client links, all-time traffic totals |
-| `/root/cert/<domain>/` | Installed certificate + key per domain |
-| `/root/.singbox-acme/account.json` | Let's Encrypt account key and registration |
-| `/root/singbox-backups/` | Backup archives |
 
 ## Uninstall
 
@@ -102,17 +87,6 @@ From the menu, choose **Uninstall** (option 13). It stops and removes the servic
 config, and menu tool. Certificates and the sysctl tuning file are left in place unless you opt
 to remove the certs when prompted.
 
-## Repository layout
-
-```
-go/                     the Go module - see go/README.md for build, release, and package details
-  cmd/singbox-menu/     entry point + subcommands (install, renew-all, menu)
-  internal/             one package per concern (certs, config, inbounds, menu, ...)
-  install.sh            curl one-liner that fetches the right release binary for your arch
-.github/workflows/
-  release-go.yml        cross-compiles and attaches binaries to a GitHub Release on a v*.*.* tag
-  go-ci.yml             builds (all target arches) and vets on every push to main touching go/
-```
 
 > [!TIP]
 > Building from source, cross-compiling, or cutting a release? See [go/README.md](go/README.md).
