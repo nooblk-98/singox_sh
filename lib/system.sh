@@ -1,5 +1,23 @@
 #!/usr/bin/env bash
 
+write_kernel_tuning() {
+  cat > "$SYSCTL_FILE" <<'SYSCTL'
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.ipv4.tcp_rmem = 4096 87380 67108864
+net.ipv4.tcp_wmem = 4096 65536 67108864
+
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_mtu_probing = 1
+net.core.netdev_max_backlog = 16384
+net.ipv4.tcp_slow_start_after_idle = 0
+SYSCTL
+  sysctl --system >/dev/null 2>&1 || warn "sysctl --system reported issues, check manually."
+}
+
 kernel_tuning_menu() {
   clear 2>/dev/null || true
   echo "== Kernel / network tuning =="
@@ -7,7 +25,12 @@ kernel_tuning_menu() {
     echo "File: $SYSCTL_FILE"
     cat "$SYSCTL_FILE"
   else
-    warn "Tuning file not present."
+    warn "Tuning file not present - BBR is not currently configured."
+    if [ "$(ask "Write and apply the BBR/network tuning file now? (Y/n)" "y")" != "n" ]; then
+      write_kernel_tuning
+      log "Wrote and applied $SYSCTL_FILE."
+      cat "$SYSCTL_FILE"
+    fi
   fi
   echo ""
   echo "Live values:"
