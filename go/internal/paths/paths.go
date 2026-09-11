@@ -9,6 +9,7 @@ const (
 	AcmeAccount   = "/root/.singbox-acme/account.json"
 	AddrFile      = "/usr/local/etc/singbox-address"
 	LinksFile     = "/usr/local/etc/singbox-links.txt"
+	DBFile        = "/usr/local/etc/singbox.db"
 	ClashAPIAddr  = "127.0.0.1:9090"
 	BackupDir     = "/root/singbox-backups"
 	AppDir        = "/usr/local/lib/singox_sh"

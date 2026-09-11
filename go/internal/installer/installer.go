@@ -312,6 +312,41 @@ func InstallRenewTimer() error {
 	return nil
 }
 
+const statsServiceUnit = `[Unit]
+Description=singox_sh traffic totals collector
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/singbox-menu stats-tick
+`
+
+const statsTimerUnit = `[Unit]
+Description=Periodic singox_sh traffic totals collection
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target
+`
+
+// InstallStatsTimer sets up a systemd timer that calls
+// `singbox-menu stats-tick` every minute, folding sing-box's Clash API
+// traffic counters (which reset to zero on every restart) into persisted,
+// cumulative totals in the database.
+func InstallStatsTimer() error {
+	if err := os.WriteFile("/etc/systemd/system/singbox-stats.service", []byte(statsServiceUnit), 0644); err != nil {
+		return err
+	}
+	if err := os.WriteFile("/etc/systemd/system/singbox-stats.timer", []byte(statsTimerUnit), 0644); err != nil {
+		return err
+	}
+	sysutil.RunSilent("systemctl", "daemon-reload")
+	sysutil.RunSilent("systemctl", "enable", "--now", "singbox-stats.timer")
+	return nil
+}
+
 // InstallSelf copies the currently-running binary to /usr/local/bin/singbox-menu.
 // Unlike the bash version, there's nothing else to copy - it's one binary.
 func InstallSelf() error {

@@ -1,25 +1,23 @@
 package store
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/nooblk-98/singox_sh/internal/paths"
+	"github.com/nooblk-98/singox_sh/internal/db"
 	"github.com/nooblk-98/singox_sh/internal/ui"
 )
 
 func GetAddress() string {
-	if b, err := os.ReadFile(paths.AddrFile); err == nil {
-		return strings.TrimSpace(string(b))
+	if addr, ok := db.GetSetting("address"); ok && addr != "" {
+		return addr
 	}
 	ip := detectIP()
-	os.WriteFile(paths.AddrFile, []byte(ip), 0644)
+	db.SetSetting("address", ip)
 	return ip
 }
 
@@ -40,7 +38,7 @@ func detectIP() string {
 }
 
 func SetAddress(addr string) {
-	os.WriteFile(paths.AddrFile, []byte(addr), 0644)
+	db.SetSetting("address", addr)
 }
 
 // DefaultAddressToDomain seeds the public address with domain the first
@@ -48,60 +46,30 @@ func SetAddress(addr string) {
 // the menu), since a real TLS domain is a more useful default than the
 // bare auto-detected IP.
 func DefaultAddressToDomain(domain string) {
-	if _, err := os.Stat(paths.AddrFile); err == nil {
+	if _, ok := db.GetSetting("address"); ok {
 		return
 	}
-	os.WriteFile(paths.AddrFile, []byte(domain), 0644)
+	db.SetSetting("address", domain)
 	ui.Log("Using %s as your public address for client links (menu option 7 to change).", domain)
 }
 
 func SaveLink(tag, uri string) {
-	links := loadLinks()
-	links[tag] = uri
-	writeLinks(links)
+	db.SetLink(tag, uri)
 	fmt.Println()
 	ui.Log("Client link (also saved, view any time via menu -> List links):")
 	fmt.Println(uri)
 }
 
 func RemoveLink(tag string) {
-	links := loadLinks()
-	delete(links, tag)
-	writeLinks(links)
+	db.DeleteLink(tag)
 }
 
 func ListLinks() map[string]string {
-	return loadLinks()
-}
-
-func loadLinks() map[string]string {
-	out := map[string]string{}
-	f, err := os.Open(paths.LinksFile)
+	links, err := db.ListLinks()
 	if err != nil {
-		return out
+		return map[string]string{}
 	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := sc.Text()
-		parts := strings.SplitN(line, "\t", 2)
-		if len(parts) == 2 {
-			out[parts[0]] = parts[1]
-		}
-	}
-	return out
-}
-
-func writeLinks(links map[string]string) error {
-	f, err := os.Create(paths.LinksFile)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	for tag, uri := range links {
-		fmt.Fprintf(f, "%s\t%s\n", tag, uri)
-	}
-	return nil
+	return links
 }
 
 type checkHostResp struct {

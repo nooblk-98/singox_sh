@@ -12,6 +12,7 @@ import (
 
 	"github.com/nooblk-98/singox_sh/internal/certs"
 	"github.com/nooblk-98/singox_sh/internal/config"
+	"github.com/nooblk-98/singox_sh/internal/db"
 	"github.com/nooblk-98/singox_sh/internal/inbounds"
 	"github.com/nooblk-98/singox_sh/internal/paths"
 	"github.com/nooblk-98/singox_sh/internal/store"
@@ -285,7 +286,7 @@ func writeKernelTuning() error {
 func backupNow() {
 	os.MkdirAll(paths.BackupDir, 0755)
 	name := fmt.Sprintf("%s/backup-%s.tar.gz", paths.BackupDir, timeStamp())
-	cmd := exec.Command("tar", "czf", name, paths.Conf, paths.CertBase, paths.SysctlFile, paths.LinksFile)
+	cmd := exec.Command("tar", "czf", name, paths.Conf, paths.CertBase, paths.SysctlFile, paths.DBFile)
 	cmd.Run()
 	ui.Log("Backup saved: %s", name)
 }
@@ -352,7 +353,17 @@ func showTraffic() {
 		}
 	}
 	fmt.Println()
-	ui.Warn("This counter resets whenever sing-box restarts - it's not persisted historical usage.")
+	ui.Warn("The totals above reset whenever sing-box restarts.")
+
+	fmt.Println()
+	fmt.Println("== All-time totals (persisted, survives restarts) ==")
+	if totals, err := db.GetTrafficTotals(); err == nil {
+		fmt.Printf("Upload total:    %s\n", bytesHuman(totals.UploadBytes))
+		fmt.Printf("Download total:  %s\n", bytesHuman(totals.DownloadBytes))
+	} else {
+		ui.Warn("Could not read persisted totals: %v", err)
+	}
+	ui.Warn("Collected once a minute by the singbox-stats.timer - counts may lag up to a minute behind live.")
 }
 
 func bytesHuman(b int64) string {
@@ -380,9 +391,14 @@ func uninstallAll() {
 	sysutil.SystemctlStop(paths.Service)
 	sysutil.RunSilent("systemctl", "disable", paths.Service)
 	os.Remove(paths.ServiceFile)
+	for _, unit := range []string{"singbox-renew.timer", "singbox-renew.service", "singbox-stats.timer", "singbox-stats.service"} {
+		sysutil.RunSilent("systemctl", "disable", "--now", unit)
+		os.Remove("/etc/systemd/system/" + unit)
+	}
 	sysutil.RunSilent("systemctl", "daemon-reload")
 	os.Remove(paths.Bin)
 	os.Remove(paths.Conf)
+	os.Remove(paths.DBFile)
 	os.Remove(paths.MenuLink)
 	os.RemoveAll(paths.AppDir)
 	ui.Log("Uninstalled. Certs (if kept) remain under %s; sysctl tuning left in place.", paths.CertBase)

@@ -17,7 +17,7 @@ Every inbound you add generates its own UUID, keys, and passwords, validates aga
 - **Safe config edits.** Every change is checked against a temp file with `sing-box check`. A bad edit never reaches the live config, and the service is rolled forward only once it restarts cleanly.
 - **Fresh secrets per install.** Nothing is hard-coded or shared between deployments.
 - **Kernel tuning.** BBR + `fq`, TCP Fast Open, MTU probing, and larger buffers, written to `/etc/sysctl.d/99-network-tune.conf`.
-- **Live traffic totals** via sing-box's Clash API, plus a status dashboard, log viewer, and one-command backup of config and certs.
+- **Live and all-time traffic totals.** Live counters via sing-box's Clash API, plus cumulative totals that survive service restarts — collected once a minute and persisted separately, since sing-box's own counters reset every restart. Also a status dashboard, log viewer, and one-command backup of config and certs.
 - **Client links** saved to disk and viewable any time from the menu.
 - **Daily certificate auto-renewal** via a systemd timer — no cron babysitting required.
 
@@ -89,8 +89,9 @@ Two independent things get updated automatically or on demand:
 | `/usr/local/etc/singbox-config.json` | Live configuration (never overwritten by the installer) |
 | `/etc/systemd/system/sing-box.service` | systemd unit (`sing-box run -c …`) |
 | `/etc/systemd/system/singbox-renew.{service,timer}` | Daily certificate renewal |
+| `/etc/systemd/system/singbox-stats.{service,timer}` | Per-minute traffic totals collection |
 | `/etc/sysctl.d/99-network-tune.conf` | BBR + network tuning |
-| `/usr/local/etc/singbox-links.txt` | Saved client links |
+| `/usr/local/etc/singbox.db` | Public address, saved client links, all-time traffic totals |
 | `/root/cert/<domain>/` | Installed certificate + key per domain |
 | `/root/.singbox-acme/account.json` | Let's Encrypt account key and registration |
 | `/root/singbox-backups/` | Backup archives |

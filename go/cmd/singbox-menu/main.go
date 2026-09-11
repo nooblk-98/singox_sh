@@ -7,6 +7,7 @@ import (
 	"github.com/nooblk-98/singox_sh/internal/certs"
 	"github.com/nooblk-98/singox_sh/internal/installer"
 	"github.com/nooblk-98/singox_sh/internal/menu"
+	"github.com/nooblk-98/singox_sh/internal/stats"
 	"github.com/nooblk-98/singox_sh/internal/ui"
 	"github.com/nooblk-98/singox_sh/internal/version"
 )
@@ -24,6 +25,13 @@ func main() {
 			menu.RequireRoot()
 			n := certs.RenewAll()
 			fmt.Printf("Renewed %d certificate(s).\n", n)
+			return
+		case "stats-tick":
+			menu.RequireRoot()
+			if err := stats.Tick(); err != nil {
+				ui.Err("%v", err)
+				os.Exit(1)
+			}
 			return
 		case "version", "--version", "-v":
 			fmt.Println(version.Version)
@@ -63,6 +71,9 @@ func runInstall(isUpdate bool) {
 	}
 	if err := installer.InstallRenewTimer(); err != nil {
 		ui.Warn("Could not install the cert-renewal timer: %v", err)
+	}
+	if err := installer.InstallStatsTimer(); err != nil {
+		ui.Warn("Could not install the traffic-stats timer: %v", err)
 	}
 	fmt.Println()
 	ui.Log("Install complete.")

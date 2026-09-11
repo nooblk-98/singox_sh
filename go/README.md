@@ -53,13 +53,15 @@ target arches) and vets on every push to `main` that touches `go/`.
 ## Layout
 
 ```
-cmd/singbox-menu/     entry point + subcommands (install, renew-all, menu)
+cmd/singbox-menu/     entry point + subcommands (install, renew-all, stats-tick, menu)
 internal/paths/       shared file/service path constants
 internal/ui/          prompts, colors, log/warn/err
 internal/sysutil/     process exec, port-free checks, random/UUID/keypair helpers
 internal/config/      sing-box JSON config load/save/validate-and-apply
 internal/certs/       Let's Encrypt issuance/renewal via lego, cert listing
-internal/store/       public address, saved links, reachability check
+internal/db/          SQLite-backed store: address, links, all-time traffic totals
+internal/stats/       folds live Clash API counters into persisted totals (stats-tick)
+internal/store/       public address, saved links, reachability check (backed by internal/db)
 internal/inbounds/    the 12 inbound builders + add/remove/list screens
 internal/menu/        the interactive menu itself
 internal/installer/   sing-box binary download, systemd units, sysctl tuning
