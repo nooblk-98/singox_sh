@@ -111,9 +111,17 @@ From the menu, choose **Uninstall** (option 13). It stops and removes the servic
 and menu tool. Certificates and the sysctl tuning file are left in place unless you opt to remove
 the certs when prompted.
 
+## Versioning
+
+The `VERSION` file at the repo root is the single source of truth for the installed
+`singox_sh` version. `install.sh` copies it to `/usr/local/lib/singox_sh/VERSION` alongside
+`menu.sh`, and the menu reads it back to show `singox_sh: vX.Y.Z` in the status dashboard and
+in the header of every screen. Bump it with every change that ships to `main`.
+
 ## Repository layout
 
 ```
 install.sh      # bootstrap: deps, sing-box, acme.sh, sysctl, systemd, menu
 lib/menu.sh     # the singbox-menu management tool
+VERSION         # singox_sh's own version, shown in the menu
 ```

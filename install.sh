@@ -174,9 +174,10 @@ install_menu() {
   src_dir="$(fetch_repo)"
   [ -f "$src_dir/lib/menu.sh" ] || die "lib/menu.sh not found in $src_dir after fetch."
   cp "$src_dir/lib/menu.sh" "$APP_DIR/menu.sh"
+  cp "$src_dir/VERSION" "$APP_DIR/VERSION" 2>/dev/null || echo "0.0.0" > "$APP_DIR/VERSION"
   chmod +x "$APP_DIR/menu.sh"
   ln -sf "$APP_DIR/menu.sh" "$MENU_LINK"
-  log "Management command installed: run 'singbox-menu' any time."
+  log "Management command installed: run 'singbox-menu' any time (version $(cat "$APP_DIR/VERSION"))."
 }
 
 cleanup() {

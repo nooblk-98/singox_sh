@@ -15,6 +15,8 @@ LINKS_FILE="/usr/local/etc/singbox-links.txt"
 CLASH_API_ADDR="127.0.0.1:9090"
 BACKUP_DIR="/root/singbox-backups"
 INSTALL_URL="https://raw.githubusercontent.com/nooblk-98/singox_sh/main/install.sh"
+VERSION_FILE="/usr/local/lib/singox_sh/VERSION"
+VERSION="$(cat "$VERSION_FILE" 2>/dev/null || echo "unknown")"
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root."; exit 1; }
 command -v jq >/dev/null || { echo "jq is required."; exit 1; }
@@ -598,7 +600,8 @@ status_dashboard() {
   echo ""
   echo "== Status =="
   systemctl is-active --quiet "$SERVICE" && echo -e "Service:      ${c_g}active${c_0}" || echo -e "Service:      ${c_r}inactive${c_0}"
-  echo "Version:      $("$BIN" version 2>/dev/null | head -1)"
+  echo "singox_sh:    v${VERSION}"
+  echo "sing-box:     $("$BIN" version 2>/dev/null | head -1)"
   echo "Uptime:       $(systemctl show -p ActiveEnterTimestamp "$SERVICE" 2>/dev/null | cut -d= -f2)"
   echo "Address:      $(get_address)"
   echo "Inbounds:     $(jq '.inbounds | length' "$CONF" 2>/dev/null) (menu option 2 for details)"
@@ -699,7 +702,7 @@ main_menu() {
     clear 2>/dev/null || true
     status_dashboard
     echo ""
-    echo -e "${c_b}=== singox_sh manager ===${c_0}"
+    echo -e "${c_b}=== singox_sh manager (v${VERSION}) ===${c_0}"
     echo " 1) Refresh"
     echo " 2) List inbounds"
     echo " 3) Add inbound"
