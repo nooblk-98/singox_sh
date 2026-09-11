@@ -153,25 +153,29 @@ UNIT
   systemctl restart sing-box || warn "sing-box failed to start - check 'journalctl -u sing-box' (likely empty inbounds, that's fine until you add one)."
 }
 
+FETCHED_SRC_DIR=""
+
 fetch_repo() {
+  # Sets FETCHED_SRC_DIR directly (not via command substitution) so a clone
+  # into CLONE_DIR is visible to the cleanup() trap in the parent shell.
   local script_dir
   script_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || true)"
   if [ -n "$script_dir" ] && [ -f "$script_dir/lib/menu.sh" ]; then
-    echo "$script_dir"
+    FETCHED_SRC_DIR="$script_dir"
     return 0
   fi
   command -v git >/dev/null 2>&1 || die "git is required to fetch lib/menu.sh but was not found."
   CLONE_DIR="$(mktemp -d)"
-  log "Fetching singox_sh source (lib/menu.sh)..." >&2
+  log "Fetching singox_sh source (lib/menu.sh)..."
   git clone --depth 1 "$REPO_URL" "$CLONE_DIR" >/dev/null 2>&1 \
     || die "Failed to clone $REPO_URL"
-  echo "$CLONE_DIR"
+  FETCHED_SRC_DIR="$CLONE_DIR"
 }
 
 install_menu() {
   mkdir -p "$APP_DIR"
-  local src_dir
-  src_dir="$(fetch_repo)"
+  fetch_repo
+  local src_dir="$FETCHED_SRC_DIR"
   [ -f "$src_dir/lib/menu.sh" ] || die "lib/menu.sh not found in $src_dir after fetch."
   cp "$src_dir/lib/menu.sh" "$APP_DIR/menu.sh"
   cp "$src_dir/VERSION" "$APP_DIR/VERSION" 2>/dev/null || echo "0.0.0" > "$APP_DIR/VERSION"
@@ -182,6 +186,7 @@ install_menu() {
 
 cleanup() {
   [ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"
+  true
 }
 trap cleanup EXIT
 
