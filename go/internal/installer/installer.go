@@ -168,19 +168,37 @@ func extractSingBoxBinary(tgz, destDir string) (string, error) {
 	return "", fmt.Errorf("sing-box binary not found in archive")
 }
 
+// copyFile writes to a temp file in dst's directory and renames it into
+// place, rather than opening dst with O_TRUNC. If dst is a symlink (e.g.
+// the bash version's /usr/local/bin/singbox-menu -> lib/menu.sh), O_TRUNC
+// follows the link and clobbers whatever it points to instead of replacing
+// the link itself - os.Rename replaces the link/file atomically instead.
 func copyFile(src, dst string, mode os.FileMode) error {
 	in, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+
+	tmp := dst + ".new"
+	out, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := out.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 func firstLine(s string) string {
