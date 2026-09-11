@@ -11,52 +11,61 @@ menu to add protocols and hand out ready-to-import client links, with no hand-ed
 
 ---
 
+> [!NOTE]
+> This `development` branch is a single-binary **Go rewrite** of the tool (previously a set of
+> bash scripts on `main`). It's been built and verified against a real server, but hasn't had
+> the extended real-world mileage `main`'s bash version has - see [Status](#status).
+
 `singox_sh` turns a fresh Ubuntu/Debian/Alpine VPS into a working sing-box relay in one run. It
-installs the latest sing-box release, sets up `acme.sh` for automatic certificate management,
-applies BBR and network tuning, registers a systemd service, and installs a `singbox-menu`
-command for day-to-day management.
+installs the latest sing-box release, issues TLS certificates via Let's Encrypt, applies BBR and
+network tuning, registers a systemd service, and installs a `singbox-menu` command for
+day-to-day management - all from one static binary with no runtime dependencies.
 
 Every inbound you add generates its own UUIDs, keys and passwords, validates against
 `sing-box check` before going live, and prints a client link you can paste straight into your app.
 
+## Why a rewrite
+
+- **One binary, no runtime dependencies.** No more `jq`, `acme.sh`, or a `lib/*.sh` directory
+  that has to travel with `menu.sh` and stay in sync.
+- **Native ACME (Let's Encrypt)** via the [lego](https://github.com/go-acme/lego) library
+  instead of shelling out to `acme.sh`. This removes a whole class of bugs the bash version hit
+  in practice: ZeroSSL's EAB requirement, invalid/reserved contact emails, and stale CA config
+  files getting out of sync with reality.
+- **Typed JSON config editing** instead of string-templated `jq` calls.
+- **Real bind checks** (`net.Listen`) for port-free detection, instead of parsing `ss` output -
+  which caused a real false-negative bug in the bash version.
+- **Self-update pulls a versioned GitHub Release binary** instead of a git sync, so there's no
+  CDN-caching surprises to design around.
+
 ## Features
 
 - **12 inbound types** from a single menu: VLESS (WS / gRPC / HTTPUpgrade / raw TCP / Reality / Reality+Vision), VMess+WS, Trojan (raw / WS), Shadowsocks (2022 AEAD or classic), Hysteria2, TUIC v5.
-- **Automatic TLS** via `acme.sh` standalone HTTP-01. Certificates are issued, installed, and wired to reload the service on renewal.
-- **Reload-hook verification**: the certificate view checks that each `acme.sh` renewal hook actually reloads *this* server's service, catching the classic "cert renews but the process never picks it up" failure.
+- **Automatic TLS** via Let's Encrypt HTTP-01, issued and installed on the spot when a domain needs one.
 - **Safe config edits**: every change is checked against a temp file with `sing-box check`. A bad edit never reaches the live config, and the service is rolled forward only if it restarts cleanly.
 - **Fresh secrets per install**: nothing is hard-coded or shared between deployments.
 - **Kernel tuning**: BBR + `fq`, TCP Fast Open, MTU probing, and larger buffers written to `/etc/sysctl.d/99-network-tune.conf`.
 - **Live traffic totals** via sing-box's Clash API, plus a status dashboard, log viewer, and one-command backup of config + certs.
-- **Client links saved** to `/usr/local/etc/singbox-links.txt` and viewable any time from the menu.
+- **Client links saved** and viewable any time from the menu.
+- **Daily auto-renewal** via a systemd timer that calls `singbox-menu renew-all`.
 
 ## Getting started
 
 On a fresh server, as root:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/nooblk-98/singox_sh/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/nooblk-98/singox_sh/development/go/install.sh | sudo bash
 ```
 
-Or clone it first if you'd rather review the script before running it:
-
-```sh
-git clone https://github.com/nooblk-98/singox_sh.git
-cd singox_sh
-sudo ./install.sh
-```
-
-> [!NOTE]
-> The installer looks for `lib/menu.sh` next to itself; if it's not there (e.g. the curl
-> one-liner above, which only fetches `install.sh`) it clones the repo into a temp directory
-> to pick it up, then cleans up after itself.
+This downloads the right release binary for your server's architecture to
+`/usr/local/bin/singbox-menu` and runs `singbox-menu install`.
 
 The installer is **safe to re-run**: it never overwrites an existing config, it only refreshes the
-binary, service, and menu tool.
+sing-box binary, systemd units, and the menu tool itself.
 
 ### Requirements
 
-- Ubuntu / Debian (`apt`) or Alpine (`apk`); root access
+- Linux, amd64/arm64/armv7, with `systemd`
 - Ports **80** free during certificate issuance (HTTP-01), plus whatever ports your inbounds listen on
 - A domain pointed at the server for any TLS-based inbound (Reality and Shadowsocks need no certificate)
 
@@ -84,25 +93,22 @@ singbox-menu
 (issued on the spot if missing) are all handled for you. The generated client link is printed and
 saved.
 
-**Certificates**: lists every issued cert with an expiry countdown and a reload-hook status
-(`OK` / `MISMATCH`), and can issue, force-renew, or repair hooks for one or all domains.
-
-> [!TIP]
-> For "SNI camouflage" setups where the SNI shown to clients differs from the real certificate
-> domain, the client must set `verifyPeerCertByName` to the real cert domain. Modern Xray-core
-> removed `allowInsecure`. The menu warns you whenever you configure a mismatched SNI.
+**Certificates**: lists every issued cert with an expiry countdown, and can issue or force-renew
+a domain on demand - auto-renewal itself runs daily via a systemd timer.
 
 ## What gets installed
 
 | Path | Purpose |
 | --- | --- |
 | `/usr/local/bin/sing-box` | sing-box binary (latest release) |
+| `/usr/local/bin/singbox-menu` | This tool - a single static binary |
 | `/usr/local/etc/singbox-config.json` | Live configuration (never overwritten by the installer) |
 | `/etc/systemd/system/sing-box.service` | systemd unit (`sing-box run -c …`) |
+| `/etc/systemd/system/singbox-renew.{service,timer}` | Daily certificate renewal |
 | `/etc/sysctl.d/99-network-tune.conf` | BBR + network tuning |
-| `/usr/local/lib/singox_sh/menu.sh` | Management menu (symlinked as `singbox-menu`) |
 | `/usr/local/etc/singbox-links.txt` | Saved client links |
 | `/root/cert/<domain>/` | Installed certificate + key per domain |
+| `/root/.singbox-acme/account.json` | Let's Encrypt account key/registration |
 | `/root/singbox-backups/` | Backup archives |
 
 ## Uninstall
@@ -111,26 +117,21 @@ From the menu, choose **Uninstall** (option 13). It stops and removes the servic
 and menu tool. Certificates and the sysctl tuning file are left in place unless you opt to remove
 the certs when prompted.
 
-## Versioning
+## Status
 
-The `VERSION` file at the repo root is the single source of truth for the installed
-`singox_sh` version. `install.sh` copies it to `/usr/local/lib/singox_sh/VERSION` alongside
-`menu.sh`, and the menu reads it back to show `singox_sh: vX.Y.Z` in the status dashboard and
-in the header of every screen. Bump it with every change that ships to `main`.
+Core flows are implemented and have been run against a real production server: install, all 12
+inbound types, cert issuance/renewal, add/remove inbounds with live config validation and service
+restart, the status dashboard, and self-update. Treat it as verified-but-young compared to the
+bash version it replaces.
 
 ## Repository layout
 
 ```
-install.sh        # bootstrap: deps, sing-box, acme.sh, sysctl, systemd, menu
-lib/menu.sh       # singbox-menu entry point: sources the modules below, runs main_menu
-lib/common.sh     # shared paths/colors, log/ask/pause, ports, address, validate_and_apply
-lib/certs.sh      # acme.sh issuance (ensure_cert) and the Certificates submenu
-lib/inbounds.sh   # VLESS/VMess/Trojan/Shadowsocks/Hysteria2/TUIC builders + add/remove/list
-lib/status.sh     # Clash API traffic totals and the status dashboard
-lib/system.sh     # kernel tuning, backups, logs, uninstall
-lib/update.sh     # self-update via git (menu option 14)
-VERSION           # singox_sh's own version, shown in the menu
+go/                     the Go module - see go/README.md for build/release details
+  cmd/singbox-menu/     entry point + subcommands (install, renew-all, menu)
+  internal/             one package per concern (certs, config, inbounds, menu, ...)
+  install.sh            curl-one-liner bootstrap that fetches the right release binary
+.github/workflows/
+  release-go.yml        cross-compiles + attaches binaries to a GitHub Release on a v*.*.* tag
+  go-ci.yml             go build + go vet on every push to development touching go/
 ```
-
-All of `lib/*.sh` travels together - install.sh copies the whole directory, since
-`menu.sh` sources its sibling modules at runtime.
