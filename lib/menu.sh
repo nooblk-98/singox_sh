@@ -184,11 +184,25 @@ ensure_cert() {
     return 0
   fi
   log "No cert found for $domain, issuing via acme.sh (needs port 80 free)..."
+  local blocker="" rc=0
   if ! port_free 80; then
     warn "Port 80 is in use - acme.sh --standalone needs it free to issue via HTTP-01."
-    [ "$(ask "Continue anyway? (y/N)" "n")" = "y" ] || return 1
+    # Let's Encrypt/ZeroSSL always validate on port 80 for HTTP-01 - there's no
+    # "use another port" option. If a known web server owns it, offer to stop
+    # it just for the issuance and bring it back up right after.
+    for svc in nginx apache2 httpd caddy; do
+      if systemctl is-active --quiet "$svc" 2>/dev/null; then blocker="$svc"; break; fi
+    done
+    if [ -n "$blocker" ] && [ "$(ask "Temporarily stop $blocker to issue the cert, then start it back up? (Y/n)" "y")" != "n" ]; then
+      systemctl stop "$blocker"
+    else
+      [ "$(ask "Continue anyway? (y/N)" "n")" = "y" ] || return 1
+      blocker=""
+    fi
   fi
-  "$ACME" --issue -d "$domain" --standalone --keylength ec-256 || { err "Cert issuance failed for $domain."; return 1; }
+  "$ACME" --issue -d "$domain" --standalone --keylength ec-256; rc=$?
+  [ -n "$blocker" ] && { systemctl start "$blocker" || warn "Failed to restart $blocker - start it manually."; }
+  [ "$rc" -eq 0 ] || { err "Cert issuance failed for $domain."; return 1; }
   mkdir -p "$certdir"
   "$ACME" --install-cert -d "$domain" --ecc \
     --key-file "$certdir/privkey.pem" \
