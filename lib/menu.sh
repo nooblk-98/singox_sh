@@ -14,7 +14,8 @@ ADDR_FILE="/usr/local/etc/singbox-address"
 LINKS_FILE="/usr/local/etc/singbox-links.txt"
 CLASH_API_ADDR="127.0.0.1:9090"
 BACKUP_DIR="/root/singbox-backups"
-INSTALL_URL="https://raw.githubusercontent.com/nooblk-98/singox_sh/main/install.sh"
+REPO_URL="https://github.com/nooblk-98/singox_sh.git"
+SRC_DIR="/usr/local/lib/singox_sh/src"
 VERSION_FILE="/usr/local/lib/singox_sh/VERSION"
 VERSION="$(cat "$VERSION_FILE" 2>/dev/null || echo "unknown")"
 
@@ -667,17 +668,21 @@ view_logs() {
 }
 
 update_singox() {
-  log "Fetching latest install.sh from $INSTALL_URL ..."
-  local tmp; tmp=$(mktemp)
-  if ! curl -fsSL "$INSTALL_URL" -o "$tmp"; then
-    err "Download failed - check network/URL."
-    rm -f "$tmp"
-    return
+  command -v git >/dev/null 2>&1 || { err "git is required to update but was not found."; return; }
+  log "Fetching latest singox_sh via git (raw.githubusercontent.com is CDN-cached, so we don't use it here)..."
+  if [ -d "$SRC_DIR/.git" ]; then
+    if ! { git -C "$SRC_DIR" fetch --depth 1 origin main >/dev/null 2>&1 \
+        && git -C "$SRC_DIR" reset --hard origin/main >/dev/null 2>&1; }; then
+      warn "git update of $SRC_DIR failed, re-cloning..."
+      rm -rf "$SRC_DIR"
+    fi
   fi
-  chmod +x "$tmp"
+  if [ ! -d "$SRC_DIR/.git" ]; then
+    rm -rf "$SRC_DIR"
+    git clone --depth 1 "$REPO_URL" "$SRC_DIR" >/dev/null 2>&1 || { err "git clone failed."; return; }
+  fi
   log "Running installer (updates sing-box binary, deps, and this menu)..."
-  if bash "$tmp" --update; then
-    rm -f "$tmp"
+  if bash "$SRC_DIR/install.sh" --update; then
     log "Update complete. Relaunching menu..."
     sleep 1
     exec /usr/local/bin/singbox-menu

@@ -8,7 +8,9 @@
 #   or: ./install.sh
 #
 # When run via the curl one-liner (no lib/menu.sh alongside this script), the
-# installer clones the repo itself into a temp dir to pick up lib/menu.sh.
+# installer fetches the repo itself via git into a persistent checkout to
+# pick up lib/menu.sh - git (unlike raw.githubusercontent.com, which sits
+# behind a caching CDN) always serves the current commit.
 #
 # Safe to re-run: will NOT overwrite an existing sing-box config, only ensures
 # the binary/service/menu tool are up to date, then launches the menu.
@@ -17,12 +19,12 @@ set -euo pipefail
 
 REPO_URL="https://github.com/nooblk-98/singox_sh.git"
 APP_DIR="/usr/local/lib/singox_sh"
+SRC_DIR="$APP_DIR/src"
 BIN="/usr/local/bin/sing-box"
 CONF="/usr/local/etc/singbox-config.json"
 SERVICE_FILE="/etc/systemd/system/sing-box.service"
 SYSCTL_FILE="/etc/sysctl.d/99-network-tune.conf"
 MENU_LINK="/usr/local/bin/singbox-menu"
-CLONE_DIR=""
 
 log()  { echo -e "\033[1;32m[+]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[!]\033[0m $*"; }
@@ -156,8 +158,7 @@ UNIT
 FETCHED_SRC_DIR=""
 
 fetch_repo() {
-  # Sets FETCHED_SRC_DIR directly (not via command substitution) so a clone
-  # into CLONE_DIR is visible to the cleanup() trap in the parent shell.
+  # Sets FETCHED_SRC_DIR directly (not via command substitution/subshell).
   local script_dir
   script_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || true)"
   if [ -n "$script_dir" ] && [ -f "$script_dir/lib/menu.sh" ]; then
@@ -165,11 +166,21 @@ fetch_repo() {
     return 0
   fi
   command -v git >/dev/null 2>&1 || die "git is required to fetch lib/menu.sh but was not found."
-  CLONE_DIR="$(mktemp -d)"
-  log "Fetching singox_sh source (lib/menu.sh)..."
-  git clone --depth 1 "$REPO_URL" "$CLONE_DIR" >/dev/null 2>&1 \
-    || die "Failed to clone $REPO_URL"
-  FETCHED_SRC_DIR="$CLONE_DIR"
+  if [ -d "$SRC_DIR/.git" ]; then
+    log "Updating cached singox_sh checkout at $SRC_DIR..."
+    if ! { git -C "$SRC_DIR" fetch --depth 1 origin main >/dev/null 2>&1 \
+        && git -C "$SRC_DIR" reset --hard origin/main >/dev/null 2>&1; }; then
+      warn "git update of $SRC_DIR failed, re-cloning..."
+      rm -rf "$SRC_DIR"
+    fi
+  fi
+  if [ ! -d "$SRC_DIR/.git" ]; then
+    log "Cloning singox_sh source into $SRC_DIR..."
+    rm -rf "$SRC_DIR"
+    git clone --depth 1 "$REPO_URL" "$SRC_DIR" >/dev/null 2>&1 \
+      || die "Failed to clone $REPO_URL"
+  fi
+  FETCHED_SRC_DIR="$SRC_DIR"
 }
 
 install_menu() {
@@ -183,12 +194,6 @@ install_menu() {
   ln -sf "$APP_DIR/menu.sh" "$MENU_LINK"
   log "Management command installed: run 'singbox-menu' any time (version $(cat "$APP_DIR/VERSION"))."
 }
-
-cleanup() {
-  [ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"
-  true
-}
-trap cleanup EXIT
 
 main() {
   install_deps
