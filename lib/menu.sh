@@ -141,6 +141,17 @@ get_address() {
   echo "$ip"
 }
 
+default_address_to_domain() {
+  # If no public address has been set yet (get_address would otherwise
+  # auto-detect and cache the server's bare IP), prefer the real cert domain
+  # of the first TLS inbound you add - it's a more useful default for client
+  # links than an IP, and you can still override it via menu option 7.
+  local domain="$1"
+  [ -f "$ADDR_FILE" ] && return 0
+  echo "$domain" > "$ADDR_FILE"
+  log "Using $domain as your public address for client links (menu option 7 to change)."
+}
+
 set_address() {
   local cur; cur=$(get_address)
   local new; new=$(ask "Public address/domain clients should connect to" "$cur")
@@ -290,6 +301,7 @@ add_vless_ws_tls() {
   local port; port=$(ask_port)
   local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
+  default_address_to_domain "$domain"
   local sni; sni=$(ask "SNI to present to clients (decoy domain, e.g. m.youtube.com; blank = same as cert domain)" "$domain")
   local path; path=$(ask "WS path" "/$(gen_hex 6)")
   local uuid; uuid=$(gen_uuid)
@@ -315,6 +327,7 @@ add_vless_raw_tls() {
   local port; port=$(ask_port)
   local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
+  default_address_to_domain "$domain"
   local sni; sni=$(ask "SNI to present to clients (decoy domain, e.g. m.youtube.com; blank = same as cert domain)" "$domain")
   local uuid; uuid=$(gen_uuid)
   local tag="vless-tcp-tls-$port"
@@ -338,6 +351,7 @@ add_vless_transport_tls() {  # grpc / httpupgrade, shared shape
   local port; port=$(ask_port)
   local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
+  default_address_to_domain "$domain"
   local sni; sni=$(ask "SNI to present to clients" "$domain")
   local uuid; uuid=$(gen_uuid)
   local tag="vless-${transport}-tls-$port"
@@ -400,6 +414,7 @@ add_vmess_ws_tls() {
   local port; port=$(ask_port)
   local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
+  default_address_to_domain "$domain"
   local sni; sni=$(ask "SNI to present to clients" "$domain")
   local path; path=$(ask "WS path" "/$(gen_hex 6)")
   local uuid; uuid=$(gen_uuid)
@@ -429,6 +444,7 @@ add_trojan() {
   local port; port=$(ask_port)
   local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
+  default_address_to_domain "$domain"
   local sni; sni=$(ask "SNI to present to clients" "$domain")
   local password; password=$(gen_b64 16)
   local certdir="$CERT_BASE/$domain"
@@ -484,6 +500,7 @@ add_hysteria2() {
   local port; port=$(ask_port "" udp)
   local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
+  default_address_to_domain "$domain"
   local password; password=$(gen_b64 16)
   local masq; masq=$(ask "Masquerade URL (decoy site shown to probers)" "https://m.youtube.com")
   local tag="hysteria2-$port"
@@ -509,6 +526,7 @@ add_tuic() {
   local port; port=$(ask_port "" udp)
   local domain; domain=$(ask "Domain (must already point DNS to this server; cert issued automatically if missing)")
   ensure_cert "$domain" || return
+  default_address_to_domain "$domain"
   local uuid; uuid=$(gen_uuid)
   local password; password=$(gen_b64 16)
   local tag="tuic-$port"
