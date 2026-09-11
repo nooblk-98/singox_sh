@@ -42,8 +42,9 @@ detect_arch() {
 install_deps() {
   if command -v apt-get >/dev/null 2>&1; then
     log "Installing dependencies (apt)..."
-    apt-get update -qq
-    apt-get install -y -qq curl jq openssl tar cron git >/dev/null
+    apt-get update -qq || warn "apt-get update had errors (bad mirror/signature?) - continuing with cached package lists."
+    apt-get install -y -qq curl jq openssl tar cron git >/dev/null \
+      || die "apt-get install failed. Check the apt-get update warnings above - a broken repo/mirror on this host is the likely cause."
   elif command -v apk >/dev/null 2>&1; then
     log "Installing dependencies (apk)..."
     apk add --no-cache curl jq openssl tar git >/dev/null
