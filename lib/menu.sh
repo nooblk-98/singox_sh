@@ -2,7 +2,7 @@
 
 set -uo pipefail
 
-LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+LIB_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]:-$0}")")" && pwd)"
 for f in common certs inbounds status system update; do
   source "$LIB_DIR/$f.sh"
 done
