@@ -36,7 +36,13 @@ func main() {
 
 func runInstall(isUpdate bool) {
 	menu.RequireRoot()
-	installer.InstallDeps()
+	if !isUpdate {
+		// Only needed on a fresh install - tar is a base package that's
+		// never going to have vanished by the time an update runs, and
+		// apt-get update is the one step in this whole flow that's actually
+		// slow/flaky in practice, so skip it here.
+		installer.InstallDeps()
+	}
 	if err := installer.InstallSingBoxBinary(); err != nil {
 		ui.Err("%v", err)
 		os.Exit(1)
@@ -64,6 +70,9 @@ func runInstall(isUpdate bool) {
 	fmt.Println("    to add inbounds, manage certificates, and view status.")
 	fmt.Println()
 	if isUpdate {
+		// Called via updater.Update()'s exec chain from an interactive menu
+		// session - go straight back into the menu, no need to ask.
+		menu.Run()
 		return
 	}
 	if ui.Confirm("Launch the menu now?", true) {

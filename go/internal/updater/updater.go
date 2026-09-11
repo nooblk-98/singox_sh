@@ -38,8 +38,11 @@ func archSuffix() string {
 
 // Update downloads the latest GitHub release binary for this OS/arch,
 // replaces the currently-installed /usr/local/bin/singbox-menu, and
-// re-execs the menu. Unlike the bash version's git-based self-update,
-// there's no separate lib/*.sh to keep in sync - it's one file.
+// re-execs it with --update so it also refreshes the sing-box binary,
+// systemd units, and renew timer - not just the menu binary itself -
+// before relaunching the menu. Unlike the bash version's git-based
+// self-update, there's no separate lib/*.sh to keep in sync - it's one
+// file.
 func Update() {
 	ui.Log("Checking for the latest singox_sh release...")
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", paths.RepoOwner, paths.RepoName)
@@ -96,10 +99,10 @@ func Update() {
 		ui.Err("Could not replace %s: %v", paths.MenuLink, err)
 		return
 	}
-	ui.Log("Updated to %s. Relaunching menu...", rel.TagName)
+	ui.Log("Updated to %s. Refreshing sing-box, systemd units, and renew timer...", rel.TagName)
 	time.Sleep(time.Second)
 
-	if err := syscall.Exec(paths.MenuLink, []string{paths.MenuLink}, os.Environ()); err != nil {
+	if err := syscall.Exec(paths.MenuLink, []string{paths.MenuLink, "--update"}, os.Environ()); err != nil {
 		ui.Err("Relaunch failed, run 'singbox-menu' manually: %v", err)
 	}
 }
