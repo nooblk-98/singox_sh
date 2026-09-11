@@ -40,9 +40,13 @@ ask() {
 }
 
 port_free() {
+  # ss -tln/-uln columns: State Recv-Q Send-Q "Local Address:Port" "Peer Address:Port"
+  # - field 4 is the local (listening) address, field 5 is the peer. Checking
+  # field 5 here always missed real conflicts since a listening socket's peer
+  # is just "0.0.0.0:*".
   local port="$1" net="${2:-tcp}" flag="-tln"
   [ "$net" = "udp" ] && flag="-uln"
-  ! ss $flag 2>/dev/null | awk '{print $5}' | grep -qE "[:.]${port}\$"
+  ! ss $flag 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${port}\$"
 }
 
 ensure_clash_api() {
