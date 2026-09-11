@@ -80,9 +80,11 @@ install_singbox_binary() {
 install_acme_sh() {
   # A bare hostname (e.g. "nextjs", no domain suffix) makes for an
   # "admin@nextjs" contact email, which Let's Encrypt rejects outright
-  # ("Domain name needs at least one dot"). Only use hostname -f if it's
-  # actually a dotted FQDN, otherwise fall back to a syntactically valid one.
-  local host_fqdn acme_email="admin@example.com"
+  # ("needs at least one dot"). A guessed fallback domain doesn't work either
+  # - Let's Encrypt explicitly blocks example.com/.org/.net as reserved. Only
+  # use hostname -f when it's a genuine dotted FQDN; otherwise register with
+  # no contact email at all (Let's Encrypt allows anonymous accounts).
+  local host_fqdn="" acme_email=""
   host_fqdn=$(hostname -f 2>/dev/null || true)
   case "$host_fqdn" in *.*) acme_email="admin@$host_fqdn" ;; esac
 
@@ -90,7 +92,7 @@ install_acme_sh() {
     log "acme.sh already installed."
   else
     log "Installing acme.sh..."
-    curl -fsSL https://get.acme.sh | sh -s email="$acme_email" >/dev/null 2>&1 \
+    curl -fsSL https://get.acme.sh | sh -s ${acme_email:+email="$acme_email"} >/dev/null 2>&1 \
       || warn "acme.sh installer had warnings - check manually if cert issuance fails."
   fi
   # acme.sh's default CA (ZeroSSL) requires fetching EAB credentials from
@@ -98,10 +100,13 @@ install_acme_sh() {
   # any hiccup (DNS, egress, ZeroSSL-side issues). Let's Encrypt needs no EAB.
   /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1 \
     || warn "Could not set Let's Encrypt as the default CA - acme.sh may fall back to ZeroSSL."
-  # Re-register (idempotent) so an existing account stuck with an invalid
-  # contact email (e.g. from before this fix) gets corrected too.
-  /root/.acme.sh/acme.sh --register-account -m "$acme_email" --server letsencrypt >/dev/null 2>&1 \
-    || warn "Could not (re)register acme.sh account with $acme_email."
+  # Clear any stale contact email left over from before this fix (a bare
+  # hostname, or a reserved domain like example.com) so it doesn't keep
+  # blocking registration.
+  sed -i "/^ACCOUNT_EMAIL=/d" /root/.acme.sh/account.conf 2>/dev/null || true
+  sed -i "/^CA_EMAIL=/d" /root/.acme.sh/ca/*/*/ca.conf 2>/dev/null || true
+  /root/.acme.sh/acme.sh --register-account ${acme_email:+-m "$acme_email"} --server letsencrypt >/dev/null 2>&1 \
+    || warn "Could not register acme.sh account${acme_email:+ with $acme_email}."
 }
 
 apply_sysctl_tuning() {
