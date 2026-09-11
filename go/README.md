@@ -1,33 +1,27 @@
-# singox_sh (Go rewrite - work in progress)
+# singox_sh (Go module)
 
-A single-binary rewrite of the `singbox-menu` tool, replacing the bash
-implementation on `main`. Lives on the `development` branch until it has
-real-world testing behind it.
+The Go implementation of `singbox-menu` — see the [top-level README](../README.md) for install
+and usage instructions. This document covers building, releasing, and the package layout.
 
-## Why
+## Why a rewrite
 
-- **One binary, no runtime dependencies.** No more `jq`, `acme.sh`, or a
-  `lib/*.sh` directory that has to travel with `menu.sh` and stay in sync.
-- **Native ACME (Let's Encrypt) via [lego](https://github.com/go-acme/lego)**
-  instead of shelling out to `acme.sh`. This removes an entire class of bugs
-  hit in the bash version: ZeroSSL's EAB requirement, invalid/reserved
-  contact emails, and stale `CA_EMAIL`/`ACCOUNT_EMAIL` config files getting
-  out of sync with reality.
+- **One binary, no runtime dependencies.** No more `jq`, `acme.sh`, or a `lib/*.sh` directory
+  that has to travel with `menu.sh` and stay in sync.
+- **Native ACME (Let's Encrypt) via [lego](https://github.com/go-acme/lego)** instead of
+  shelling out to `acme.sh`. This removes an entire class of bugs the bash version hit in
+  practice: ZeroSSL's EAB requirement, invalid/reserved contact emails, and stale
+  `CA_EMAIL`/`ACCOUNT_EMAIL` config files getting out of sync with reality.
 - **Typed JSON config editing** instead of `jq` string templates.
-- **A real HTTP client with actual bind checks** for port-free detection
-  (`net.Listen`), instead of parsing `ss` output - which caused a real
-  false-negative bug in the bash version.
-- Self-update pulls a versioned GitHub Release binary instead of `git
-  fetch`, so there's no CDN-caching surprises to design around (the
-  `raw.githubusercontent.com` issue the bash version had to work around).
+- **Real bind checks** (`net.Listen`) for port-free detection, instead of parsing `ss` output —
+  which caused a real false-negative bug in the bash version.
+- **Self-update pulls a versioned GitHub Release binary** instead of a git sync, so there's no
+  CDN-caching surprises to design around.
 
 ## Status
 
-Core flows are implemented: install, all 12 inbound types, cert
-issuance/renewal, the status dashboard, kernel tuning, backups, uninstall,
-and self-update. It has **not** yet been run against a real server the way
-the bash version was throughout this project - treat it as a first pass
-that needs real testing before it replaces `main`.
+Verified against a real production server: install (including cutover from the prior bash
+install), all 12 inbound types, add/remove with live `sing-box check` validation and service
+restart, the status dashboard, and certificate handling.
 
 ## Building
 
@@ -42,22 +36,19 @@ Cross-compile for a target arch:
 GOOS=linux GOARCH=arm64 go build -o singbox-menu-linux-arm64 ./cmd/singbox-menu
 ```
 
-## Installing on a server
+Set the version string at build time (the release workflow does this from the git tag):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/nooblk-98/singox_sh/development/go/install.sh | sudo bash
+go build -ldflags "-X github.com/nooblk-98/singox_sh/internal/version.Version=1.0.0" \
+  -o singbox-menu ./cmd/singbox-menu
 ```
-
-This downloads the right release binary for the server's arch to
-`/usr/local/bin/singbox-menu` and runs `singbox-menu install`.
 
 ## Releasing
 
-Pushing a tag matching `v*.*.*` triggers `.github/workflows/release-go.yml`,
-which cross-compiles `linux/amd64`, `linux/arm64`, and `linux/armv7`
-binaries and attaches them to a GitHub Release as
-`singbox-menu-linux-<arch>`. `.github/workflows/go-ci.yml` runs `go build`
-and `go vet` on every push to `development` that touches `go/`.
+Pushing a tag matching `v*.*.*` triggers `.github/workflows/release-go.yml`, which
+cross-compiles `linux/amd64`, `linux/arm64`, and `linux/armv7` binaries and attaches them to a
+GitHub Release as `singbox-menu-linux-<arch>`. `.github/workflows/go-ci.yml` builds (all three
+target arches) and vets on every push to `main` that touches `go/`.
 
 ## Layout
 
