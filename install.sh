@@ -1,19 +1,4 @@
 #!/usr/bin/env bash
-# singox_sh installer - bootstraps a sing-box relay server (VLESS/VMess/Trojan/
-# Shadowsocks/Hysteria2/TUIC) with acme.sh certificate management, BBR/network
-# tuning, and installs the `singbox-menu` management command.
-#
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/nooblk-98/singox_sh/main/install.sh | bash
-#   or: ./install.sh
-#
-# When run via the curl one-liner (no lib/menu.sh alongside this script), the
-# installer fetches the repo itself via git into a persistent checkout to
-# pick up lib/menu.sh - git (unlike raw.githubusercontent.com, which sits
-# behind a caching CDN) always serves the current commit.
-#
-# Safe to re-run: will NOT overwrite an existing sing-box config, only ensures
-# the binary/service/menu tool are up to date, then launches the menu.
 
 set -euo pipefail
 
@@ -78,12 +63,6 @@ install_singbox_binary() {
 }
 
 install_acme_sh() {
-  # A bare hostname (e.g. "nextjs", no domain suffix) makes for an
-  # "admin@nextjs" contact email, which Let's Encrypt rejects outright
-  # ("needs at least one dot"). A guessed fallback domain doesn't work either
-  # - Let's Encrypt explicitly blocks example.com/.org/.net as reserved. Only
-  # use hostname -f when it's a genuine dotted FQDN; otherwise register with
-  # no contact email at all (Let's Encrypt allows anonymous accounts).
   local host_fqdn="" acme_email=""
   host_fqdn=$(hostname -f 2>/dev/null || true)
   case "$host_fqdn" in *.*) acme_email="admin@$host_fqdn" ;; esac
@@ -95,14 +74,8 @@ install_acme_sh() {
     curl -fsSL https://get.acme.sh | sh -s ${acme_email:+email="$acme_email"} >/dev/null 2>&1 \
       || warn "acme.sh installer had warnings - check manually if cert issuance fails."
   fi
-  # acme.sh's default CA (ZeroSSL) requires fetching EAB credentials from
-  # ZeroSSL's API on first issuance, which fails outright if that lookup has
-  # any hiccup (DNS, egress, ZeroSSL-side issues). Let's Encrypt needs no EAB.
   /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1 \
     || warn "Could not set Let's Encrypt as the default CA - acme.sh may fall back to ZeroSSL."
-  # Clear any stale contact email left over from before this fix (a bare
-  # hostname, or a reserved domain like example.com) so it doesn't keep
-  # blocking registration.
   sed -i "/^ACCOUNT_EMAIL=/d" /root/.acme.sh/account.conf 2>/dev/null || true
   sed -i "/^CA_EMAIL=/d" /root/.acme.sh/ca/*/*/ca.conf 2>/dev/null || true
   /root/.acme.sh/acme.sh --register-account ${acme_email:+-m "$acme_email"} --server letsencrypt >/dev/null 2>&1 \
@@ -115,17 +88,14 @@ apply_sysctl_tuning() {
   else
     log "Writing network tuning to $SYSCTL_FILE"
     cat > "$SYSCTL_FILE" <<'SYSCTL'
-# BBR congestion control + fair queueing
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 
-# Larger TCP buffers for higher bandwidth-delay-product paths
 net.core.rmem_max = 67108864
 net.core.wmem_max = 67108864
 net.ipv4.tcp_rmem = 4096 87380 67108864
 net.ipv4.tcp_wmem = 4096 65536 67108864
 
-# Misc
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_mtu_probing = 1
 net.core.netdev_max_backlog = 16384
@@ -180,7 +150,6 @@ UNIT
 FETCHED_SRC_DIR=""
 
 fetch_repo() {
-  # Sets FETCHED_SRC_DIR directly (not via command substitution/subshell).
   local script_dir
   script_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || true)"
   if [ -n "$script_dir" ] && [ -f "$script_dir/lib/menu.sh" ]; then
@@ -210,9 +179,9 @@ install_menu() {
   fetch_repo
   local src_dir="$FETCHED_SRC_DIR"
   [ -f "$src_dir/lib/menu.sh" ] || die "lib/menu.sh not found in $src_dir after fetch."
-  cp "$src_dir/lib/menu.sh" "$APP_DIR/menu.sh"
+  cp "$src_dir"/lib/*.sh "$APP_DIR/"
   cp "$src_dir/VERSION" "$APP_DIR/VERSION" 2>/dev/null || echo "0.0.0" > "$APP_DIR/VERSION"
-  chmod +x "$APP_DIR/menu.sh"
+  chmod +x "$APP_DIR"/*.sh
   ln -sf "$APP_DIR/menu.sh" "$MENU_LINK"
   log "Management command installed: run 'singbox-menu' any time (version $(cat "$APP_DIR/VERSION"))."
 }
@@ -230,8 +199,6 @@ main() {
   echo "    Run:  singbox-menu"
   echo "    to add inbounds, manage certificates, and view status."
   echo ""
-  # --update: called from the menu's "Update" option, which relaunches the
-  # menu itself afterward - skip the prompt/exec here to avoid nesting.
   [ "${1:-}" = "--update" ] && return 0
   read -r -p "Launch the menu now? [Y/n] " ans
   if [ "${ans,,}" != "n" ]; then

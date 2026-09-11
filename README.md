@@ -121,7 +121,16 @@ in the header of every screen. Bump it with every change that ships to `main`.
 ## Repository layout
 
 ```
-install.sh      # bootstrap: deps, sing-box, acme.sh, sysctl, systemd, menu
-lib/menu.sh     # the singbox-menu management tool
-VERSION         # singox_sh's own version, shown in the menu
+install.sh        # bootstrap: deps, sing-box, acme.sh, sysctl, systemd, menu
+lib/menu.sh       # singbox-menu entry point: sources the modules below, runs main_menu
+lib/common.sh     # shared paths/colors, log/ask/pause, ports, address, validate_and_apply
+lib/certs.sh      # acme.sh issuance (ensure_cert) and the Certificates submenu
+lib/inbounds.sh   # VLESS/VMess/Trojan/Shadowsocks/Hysteria2/TUIC builders + add/remove/list
+lib/status.sh     # Clash API traffic totals and the status dashboard
+lib/system.sh     # kernel tuning, backups, logs, uninstall
+lib/update.sh     # self-update via git (menu option 14)
+VERSION           # singox_sh's own version, shown in the menu
 ```
+
+All of `lib/*.sh` travels together - install.sh copies the whole directory, since
+`menu.sh` sources its sibling modules at runtime.
