@@ -14,6 +14,7 @@ ADDR_FILE="/usr/local/etc/singbox-address"
 LINKS_FILE="/usr/local/etc/singbox-links.txt"
 CLASH_API_ADDR="127.0.0.1:9090"
 BACKUP_DIR="/root/singbox-backups"
+INSTALL_URL="https://raw.githubusercontent.com/nooblk-98/singox_sh/main/install.sh"
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root."; exit 1; }
 command -v jq >/dev/null || { echo "jq is required."; exit 1; }
@@ -644,6 +645,27 @@ view_logs() {
   pause
 }
 
+update_singox() {
+  log "Fetching latest install.sh from $INSTALL_URL ..."
+  local tmp; tmp=$(mktemp)
+  if ! curl -fsSL "$INSTALL_URL" -o "$tmp"; then
+    err "Download failed - check network/URL."
+    rm -f "$tmp"
+    return
+  fi
+  chmod +x "$tmp"
+  log "Running installer (updates sing-box binary, deps, and this menu)..."
+  if bash "$tmp" --update; then
+    rm -f "$tmp"
+    log "Update complete. Relaunching menu..."
+    sleep 1
+    exec /usr/local/bin/singbox-menu
+  else
+    err "Update failed - see output above. Your existing install is untouched."
+    rm -f "$tmp"
+  fi
+}
+
 uninstall_all() {
   warn "This stops and removes sing-box, its config, service, and the menu tool."
   [ "$(ask "Also delete certificates under $CERT_BASE? (y/N)" "n")" = "y" ] && rm -rf "$CERT_BASE"
@@ -677,6 +699,7 @@ main_menu() {
     echo "11) Restart service"
     echo "12) Live traffic totals"
     echo "13) Uninstall"
+    echo "14) Update singox_sh (pull latest + relaunch)"
     echo " 0) Exit"
     case "$(ask "Choose" "1")" in
       1) : ;;
@@ -692,6 +715,7 @@ main_menu() {
       11) systemctl restart "$SERVICE" && log "Restarted." || err "Restart failed."; pause ;;
       12) show_traffic; pause ;;
       13) uninstall_all ;;
+      14) update_singox ;;
       0) exit 0 ;;
       *) warn "Invalid choice." ;;
     esac

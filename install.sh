@@ -196,6 +196,9 @@ main() {
   echo "    Run:  singbox-menu"
   echo "    to add inbounds, manage certificates, and view status."
   echo ""
+  # --update: called from the menu's "Update" option, which relaunches the
+  # menu itself afterward - skip the prompt/exec here to avoid nesting.
+  [ "${1:-}" = "--update" ] && return 0
   read -r -p "Launch the menu now? [Y/n] " ans
   if [ "${ans,,}" != "n" ]; then
     exec "$MENU_LINK"
