@@ -39,6 +39,7 @@ add_vless_ws_tls() {
   local addr; addr=$(get_address)
   local uri="vless://${uuid}@${addr}:${port}?type=ws&security=tls&path=$(urlenc "$path")&sni=${sni}&fp=chrome#${tag}"
   save_link "$tag" "$uri"
+  check_reachability "$addr" "$port" tcp
   [ "$sni" != "$domain" ] && warn "SNI differs from cert domain - client must set verifyPeerCertByName=$domain (Xray) or the equivalent for its core, since allowInsecure is removed in modern Xray."
 }
 
@@ -62,6 +63,7 @@ add_vless_raw_tls() {
   local addr; addr=$(get_address)
   local uri="vless://${uuid}@${addr}:${port}?type=tcp&security=tls&sni=${sni}&fp=chrome#${tag}"
   save_link "$tag" "$uri"
+  check_reachability "$addr" "$port" tcp
   [ "$sni" != "$domain" ] && warn "SNI differs from cert domain - client must set verifyPeerCertByName=$domain (Xray) or use the sing-box core, whose native insecure flag handles this without that workaround."
 }
 
@@ -97,6 +99,7 @@ add_vless_transport_tls() {
   local addr; addr=$(get_address)
   local uri="vless://${uuid}@${addr}:${port}?security=tls&sni=${sni}&fp=chrome&${extra_qs}#${tag}"
   save_link "$tag" "$uri"
+  check_reachability "$addr" "$port" tcp
   [ "$sni" != "$domain" ] && warn "SNI differs from cert domain - client must set verifyPeerCertByName=$domain."
 }
 
@@ -127,6 +130,7 @@ add_vless_reality() {
   local flowqs=""; [ -n "$flow" ] && flowqs="&flow=$flow"
   local uri="vless://${uuid}@${addr}:${port}?type=tcp&security=reality${flowqs}&sni=${hs_domain}&fp=chrome&pbk=${pub}&sid=${shortid}&encryption=none#${tag}"
   save_link "$tag" "$uri"
+  check_reachability "$addr" "$port" tcp
 }
 
 add_vmess_ws_tls() {
@@ -155,6 +159,7 @@ add_vmess_ws_tls() {
     '{v:$v,ps:$ps,add:$add,port:$port,id:$id,aid:$aid,net:$net,type:$type,host:$host,path:$path,tls:$tls,sni:$sni}')
   local uri="vmess://$(echo -n "$vmess_json" | base64 -w0)"
   save_link "$tag" "$uri"
+  check_reachability "$addr" "$port" tcp
   [ "$sni" != "$domain" ] && warn "SNI differs from cert domain - client must set verifyPeerCertByName=$domain."
 }
 
@@ -187,6 +192,7 @@ add_trojan() {
   local addr; addr=$(get_address)
   local uri="trojan://${password}@${addr}:${port}?security=tls&sni=${sni}${qs}#${tag}"
   save_link "$tag" "$uri"
+  check_reachability "$addr" "$port" tcp
   [ "$sni" != "$domain" ] && warn "SNI differs from cert domain - client must set verifyPeerCertByName=$domain."
 }
 
@@ -213,6 +219,7 @@ add_shadowsocks() {
   local userinfo; userinfo=$(echo -n "${method}:${password}" | base64 -w0 | tr -d '\n')
   local uri="ss://${userinfo}@${addr}:${port}#${tag}"
   save_link "$tag" "$uri"
+  check_reachability "$addr" "$port" tcp
 }
 
 add_hysteria2() {
@@ -239,6 +246,7 @@ add_hysteria2() {
   local addr; addr=$(get_address)
   local uri="hysteria2://${password}@${addr}:${port}/?sni=${domain}&alpn=h3#${tag}"
   save_link "$tag" "$uri"
+  check_reachability "$addr" "$port" udp
 }
 
 add_tuic() {
@@ -261,6 +269,7 @@ add_tuic() {
   local addr; addr=$(get_address)
   local uri="tuic://${uuid}:${password}@${addr}:${port}?congestion_control=bbr&alpn=h3&sni=${domain}#${tag}"
   save_link "$tag" "$uri"
+  check_reachability "$addr" "$port" udp
 }
 
 add_inbound_menu() {

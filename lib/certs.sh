@@ -17,6 +17,10 @@ cert_expiry_line() {
   echo "${enddate}|${days}"
 }
 
+acme_cron_installed() {
+  crontab -l 2>/dev/null | grep -qE 'acme\.sh.*--cron'
+}
+
 ensure_cert() {
   local domain="$1"
   local certdir="$CERT_BASE/$domain"
@@ -64,6 +68,11 @@ cert_menu() {
   while true; do
     clear 2>/dev/null || true
     echo "== Certificates =="
+    if acme_cron_installed; then
+      echo -e "Auto-renewal cron: ${c_g}installed${c_0}"
+    else
+      echo -e "Auto-renewal cron: ${c_r}NOT installed${c_0} (option 4 to fix)"
+    fi
     if compgen -G "$CERT_BASE/*/fullchain.pem" >/dev/null; then
       for f in "$CERT_BASE"/*/fullchain.pem; do
         local domain; domain=$(basename "$(dirname "$f")")
@@ -85,6 +94,7 @@ cert_menu() {
     echo "  1) Issue/repair cert for a domain"
     echo "  2) Force-renew a domain now"
     echo "  3) Verify + fix reload hooks for all domains"
+    echo "  4) Install/repair auto-renewal cron job"
     echo "  0) Back"
     case "$(ask "Choose" "0")" in
       1) ensure_cert "$(ask "Domain")"; pause ;;
@@ -96,6 +106,11 @@ cert_menu() {
             ensure_cert "$domain"
           done
         fi
+        pause ;;
+      4)
+        "$ACME" --install-cronjob >/dev/null 2>&1 \
+          && log "Auto-renewal cron job installed." \
+          || err "Failed to install cron job - check manually with '$ACME --install-cronjob'."
         pause ;;
       0) return ;;
     esac

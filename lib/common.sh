@@ -99,6 +99,34 @@ validate_and_apply() {
   fi
 }
 
+check_reachability() {
+  local addr="$1" port="$2" net="${3:-tcp}"
+  if [ "$net" != "tcp" ]; then
+    warn "UDP reachability isn't checked automatically - test with a real client, or check your firewall/security group for UDP $port."
+    return
+  fi
+  log "Checking external reachability of ${addr}:${port} (best-effort, via check-host.net)..."
+  local resp req_id
+  resp=$(curl -s -H "Accept: application/json" --max-time 8 "https://check-host.net/check-tcp?host=${addr}:${port}&max_nodes=1" 2>/dev/null)
+  req_id=$(echo "$resp" | jq -r '.request_id // empty' 2>/dev/null)
+  if [ -z "$req_id" ]; then
+    warn "Reachability check unavailable right now - verify manually if clients can't connect."
+    return
+  fi
+  local attempt status="null" result
+  for attempt in 1 2 3 4; do
+    sleep 3
+    result=$(curl -s --max-time 8 "https://check-host.net/check-result/${req_id}" 2>/dev/null)
+    status=$(echo "$result" | jq -r 'to_entries[0].value[0][0] // "null"' 2>/dev/null)
+    [ "$status" != "null" ] && [ -n "$status" ] && break
+  done
+  if [ "$status" = "1" ]; then
+    log "Port ${port} is reachable from outside."
+  else
+    warn "Port ${port} does NOT appear reachable from outside - check firewall/security group rules (ufw, cloud provider firewall, NAT) before sharing this link."
+  fi
+}
+
 bytes_human() {
   local b="$1"
   awk -v b="$b" 'BEGIN {
