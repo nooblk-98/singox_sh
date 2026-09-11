@@ -59,7 +59,7 @@ singbox-menu
  5) List saved client links    11) Restart service
  6) Certificates               12) Live traffic totals
                                13) Uninstall
-                               14) Update singox_sh (pull latest + relaunch)
+                               14) Update singox_sh
 ```
 
 **Adding an inbound** — pick a protocol and a port. The UUID, keys, passwords, and TLS

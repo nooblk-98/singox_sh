@@ -48,7 +48,7 @@ func Run() {
 		fmt.Println("11) Restart service")
 		fmt.Println("12) Live traffic totals")
 		fmt.Println("13) Uninstall")
-		fmt.Println("14) Update singox_sh (pull latest + relaunch)")
+		fmt.Println("14) Update singox_sh")
 		fmt.Println(" 0) Exit")
 
 		switch ui.Ask("Choose", "1") {
