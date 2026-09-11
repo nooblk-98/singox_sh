@@ -78,11 +78,19 @@ install_singbox_binary() {
 }
 
 install_acme_sh() {
+  # A bare hostname (e.g. "nextjs", no domain suffix) makes for an
+  # "admin@nextjs" contact email, which Let's Encrypt rejects outright
+  # ("Domain name needs at least one dot"). Only use hostname -f if it's
+  # actually a dotted FQDN, otherwise fall back to a syntactically valid one.
+  local host_fqdn acme_email="admin@example.com"
+  host_fqdn=$(hostname -f 2>/dev/null || true)
+  case "$host_fqdn" in *.*) acme_email="admin@$host_fqdn" ;; esac
+
   if [ -x "/root/.acme.sh/acme.sh" ]; then
     log "acme.sh already installed."
   else
     log "Installing acme.sh..."
-    curl -fsSL https://get.acme.sh | sh -s email="admin@$(hostname -f 2>/dev/null || echo example.com)" >/dev/null 2>&1 \
+    curl -fsSL https://get.acme.sh | sh -s email="$acme_email" >/dev/null 2>&1 \
       || warn "acme.sh installer had warnings - check manually if cert issuance fails."
   fi
   # acme.sh's default CA (ZeroSSL) requires fetching EAB credentials from
@@ -90,6 +98,10 @@ install_acme_sh() {
   # any hiccup (DNS, egress, ZeroSSL-side issues). Let's Encrypt needs no EAB.
   /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1 \
     || warn "Could not set Let's Encrypt as the default CA - acme.sh may fall back to ZeroSSL."
+  # Re-register (idempotent) so an existing account stuck with an invalid
+  # contact email (e.g. from before this fix) gets corrected too.
+  /root/.acme.sh/acme.sh --register-account -m "$acme_email" --server letsencrypt >/dev/null 2>&1 \
+    || warn "Could not (re)register acme.sh account with $acme_email."
 }
 
 apply_sysctl_tuning() {
