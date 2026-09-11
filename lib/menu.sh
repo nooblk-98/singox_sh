@@ -209,7 +209,14 @@ ensure_cert() {
   fi
   "$ACME" --issue -d "$domain" --standalone --keylength ec-256; rc=$?
   [ -n "$blocker" ] && { systemctl start "$blocker" || warn "Failed to restart $blocker - start it manually."; }
-  [ "$rc" -eq 0 ] || { err "Cert issuance failed for $domain."; return 1; }
+  # acme.sh exits non-zero for "already have a valid, unexpired cert - skipping"
+  # too, not just real failures - treat that as success rather than failing an
+  # otherwise-fine install/inbound-add just because the domain was issued
+  # (e.g. manually, or by a previous run) minutes earlier.
+  if [ "$rc" -ne 0 ] && [ ! -f "/root/.acme.sh/${domain}_ecc/fullchain.cer" ]; then
+    err "Cert issuance failed for $domain."
+    return 1
+  fi
   mkdir -p "$certdir"
   "$ACME" --install-cert -d "$domain" --ecc \
     --key-file "$certdir/privkey.pem" \
