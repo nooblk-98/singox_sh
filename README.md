@@ -35,14 +35,21 @@ Every inbound you add generates its own UUIDs, keys and passwords, validates aga
 On a fresh server, as root:
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/nooblk-98/singox_sh/main/install.sh | sudo bash
+```
+
+Or clone it first if you'd rather review the script before running it:
+
+```sh
 git clone https://github.com/nooblk-98/singox_sh.git
 cd singox_sh
 sudo ./install.sh
 ```
 
 > [!NOTE]
-> The installer copies `lib/menu.sh` from the checkout, so clone the repo rather than piping a
-> single file. `gh repo clone nooblk-98/singox_sh` works too.
+> The installer looks for `lib/menu.sh` next to itself; if it's not there (e.g. the curl
+> one-liner above, which only fetches `install.sh`) it clones the repo into a temp directory
+> to pick it up, then cleans up after itself.
 
 The installer is **safe to re-run**: it never overwrites an existing config, it only refreshes the
 binary, service, and menu tool.

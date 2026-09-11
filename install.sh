@@ -7,17 +7,22 @@
 #   curl -fsSL https://raw.githubusercontent.com/nooblk-98/singox_sh/main/install.sh | bash
 #   or: ./install.sh
 #
+# When run via the curl one-liner (no lib/menu.sh alongside this script), the
+# installer clones the repo itself into a temp dir to pick up lib/menu.sh.
+#
 # Safe to re-run: will NOT overwrite an existing sing-box config, only ensures
 # the binary/service/menu tool are up to date, then launches the menu.
 
 set -euo pipefail
 
+REPO_URL="https://github.com/nooblk-98/singox_sh.git"
 APP_DIR="/usr/local/lib/singox_sh"
 BIN="/usr/local/bin/sing-box"
 CONF="/usr/local/etc/singbox-config.json"
 SERVICE_FILE="/etc/systemd/system/sing-box.service"
 SYSCTL_FILE="/etc/sysctl.d/99-network-tune.conf"
 MENU_LINK="/usr/local/bin/singbox-menu"
+CLONE_DIR=""
 
 log()  { echo -e "\033[1;32m[+]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[!]\033[0m $*"; }
@@ -38,12 +43,12 @@ install_deps() {
   if command -v apt-get >/dev/null 2>&1; then
     log "Installing dependencies (apt)..."
     apt-get update -qq
-    apt-get install -y -qq curl jq openssl tar cron >/dev/null
+    apt-get install -y -qq curl jq openssl tar cron git >/dev/null
   elif command -v apk >/dev/null 2>&1; then
     log "Installing dependencies (apk)..."
-    apk add --no-cache curl jq openssl tar >/dev/null
+    apk add --no-cache curl jq openssl tar git >/dev/null
   else
-    warn "Unknown package manager - ensure curl, jq, openssl, tar are installed."
+    warn "Unknown package manager - ensure curl, jq, openssl, tar, git are installed."
   fi
 }
 
@@ -147,19 +152,36 @@ UNIT
   systemctl restart sing-box || warn "sing-box failed to start - check 'journalctl -u sing-box' (likely empty inbounds, that's fine until you add one)."
 }
 
+fetch_repo() {
+  local script_dir
+  script_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || true)"
+  if [ -n "$script_dir" ] && [ -f "$script_dir/lib/menu.sh" ]; then
+    echo "$script_dir"
+    return 0
+  fi
+  command -v git >/dev/null 2>&1 || die "git is required to fetch lib/menu.sh but was not found."
+  CLONE_DIR="$(mktemp -d)"
+  log "Fetching singox_sh source (lib/menu.sh)..." >&2
+  git clone --depth 1 "$REPO_URL" "$CLONE_DIR" >/dev/null 2>&1 \
+    || die "Failed to clone $REPO_URL"
+  echo "$CLONE_DIR"
+}
+
 install_menu() {
   mkdir -p "$APP_DIR"
-  if [ -f "$(dirname "$0")/lib/menu.sh" ]; then
-    cp "$(dirname "$0")/lib/menu.sh" "$APP_DIR/menu.sh"
-  else
-    die "lib/menu.sh not found next to install.sh. This repo is PRIVATE, so it must be" \
-        "'git clone'd (with an authenticated GitHub CLI/token/deploy key) rather than" \
-        "fetched via a public curl one-liner. Run: git clone https://github.com/nooblk-98/singox_sh.git && cd singox_sh && sudo ./install.sh"
-  fi
+  local src_dir
+  src_dir="$(fetch_repo)"
+  [ -f "$src_dir/lib/menu.sh" ] || die "lib/menu.sh not found in $src_dir after fetch."
+  cp "$src_dir/lib/menu.sh" "$APP_DIR/menu.sh"
   chmod +x "$APP_DIR/menu.sh"
   ln -sf "$APP_DIR/menu.sh" "$MENU_LINK"
   log "Management command installed: run 'singbox-menu' any time."
 }
+
+cleanup() {
+  [ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"
+}
+trap cleanup EXIT
 
 main() {
   install_deps
