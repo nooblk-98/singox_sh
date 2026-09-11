@@ -107,23 +107,29 @@ check_reachability() {
   fi
   log "Checking external reachability of ${addr}:${port} (best-effort, via check-host.net)..."
   local resp req_id
-  resp=$(curl -s -H "Accept: application/json" --max-time 8 "https://check-host.net/check-tcp?host=${addr}:${port}&max_nodes=1" 2>/dev/null)
+  resp=$(curl -s -H "Accept: application/json" --max-time 8 "https://check-host.net/check-tcp?host=${addr}:${port}&max_nodes=2" 2>/dev/null)
   req_id=$(echo "$resp" | jq -r '.request_id // empty' 2>/dev/null)
   if [ -z "$req_id" ]; then
     warn "Reachability check unavailable right now - verify manually if clients can't connect."
     return
   fi
-  local attempt status="null" result
-  for attempt in 1 2 3 4; do
+  # Response shape per node: [{"time": <seconds>}] on a successful connect,
+  # [{"error": "..."}] on failure/timeout - flatten every node's results and
+  # call it reachable if any one of them got through.
+  local attempt result done_count=0 reachable=""
+  for attempt in 1 2 3 4 5; do
     sleep 3
     result=$(curl -s --max-time 8 "https://check-host.net/check-result/${req_id}" 2>/dev/null)
-    status=$(echo "$result" | jq -r 'to_entries[0].value[0][0] // "null"' 2>/dev/null)
-    [ "$status" != "null" ] && [ -n "$status" ] && break
+    done_count=$(echo "$result" | jq '[.[][]] | map(select(has("time") or has("error"))) | length' 2>/dev/null)
+    [ "${done_count:-0}" -ge 1 ] && break
   done
-  if [ "$status" = "1" ]; then
+  reachable=$(echo "$result" | jq -r '[.[][]] | map(has("time")) | any' 2>/dev/null)
+  if [ "$reachable" = "true" ]; then
     log "Port ${port} is reachable from outside."
-  else
+  elif [ "$reachable" = "false" ]; then
     warn "Port ${port} does NOT appear reachable from outside - check firewall/security group rules (ufw, cloud provider firewall, NAT) before sharing this link."
+  else
+    warn "Reachability check inconclusive - verify manually if clients can't connect."
   fi
 }
 
