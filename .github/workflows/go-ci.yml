@@ -1,0 +1,24 @@
+name: Go build check
+
+on:
+  push:
+    branches: ["development"]
+    paths: ["go/**", ".github/workflows/go-ci.yml"]
+  pull_request:
+    paths: ["go/**"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: go/go.sum
+      - name: Build (linux/amd64)
+        working-directory: go
+        run: go build ./...
+      - name: Vet
+        working-directory: go
+        run: go vet ./...
