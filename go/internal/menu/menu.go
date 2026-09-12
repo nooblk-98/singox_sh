@@ -35,22 +35,7 @@ func Run() {
 		ui.Clear()
 		statusDashboard()
 		fmt.Println()
-		fmt.Printf("%s=== singox_sh manager (v%s) ===%s\n", ui.Blue, version.Version, ui.Reset)
-		fmt.Println(" 1) Refresh")
-		fmt.Println(" 2) List inbounds")
-		fmt.Println(" 3) Add inbound")
-		fmt.Println(" 4) Remove inbound")
-		fmt.Println(" 5) List saved client links")
-		fmt.Println(" 6) Certificates")
-		fmt.Println(" 7) Set public address/domain for links")
-		fmt.Println(" 8) Kernel/network tuning")
-		fmt.Println(" 9) View logs")
-		fmt.Println("10) Backup config+certs now")
-		fmt.Println("11) Restart service")
-		fmt.Println("12) Live traffic totals")
-		fmt.Println("13) Uninstall")
-		fmt.Println("14) Update singox_sh")
-		fmt.Println(" 0) Exit")
+		printMenuBox()
 
 		switch ui.Ask("Choose", "1") {
 		case "1":
@@ -97,6 +82,38 @@ func Run() {
 			ui.Warn("Invalid choice.")
 		}
 	}
+}
+
+const menuColWidth = 30
+const menuInnerWidth = menuColWidth*2 + 4 // " " + col + "  " + col + " " between the two │
+
+func menuRow(left, right string) {
+	fmt.Printf("│ %-*s  %-*s │\n", menuColWidth, left, menuColWidth, right)
+}
+
+func menuBlank() {
+	fmt.Printf("│%s│\n", strings.Repeat(" ", menuInnerWidth))
+}
+
+func printMenuBox() {
+	title := fmt.Sprintf(" singox_sh manager (v%s) ", version.Version)
+	fmt.Printf("%s╭─%s%s╮%s\n", ui.Blue, title, strings.Repeat("─", menuInnerWidth-1-len(title)), ui.Reset)
+	menuBlank()
+	menuRow("INBOUNDS", "CERTS & NETWORK")
+	menuRow(" 2) List inbounds", " 6) Certificates")
+	menuRow(" 3) Add inbound", " 7) Set public address/domain")
+	menuRow(" 4) Remove inbound", " 8) Kernel/network tuning")
+	menuRow(" 5) List saved client links", "")
+	menuBlank()
+	menuRow("OPERATIONS", "TOOL")
+	menuRow(" 9) View logs", "13) Uninstall")
+	menuRow("10) Backup config+certs now", "14) Update singox_sh")
+	menuRow("11) Restart service", "")
+	menuRow("12) Live traffic totals", "")
+	menuBlank()
+	menuRow(" 1) Refresh", " 0) Exit")
+	menuBlank()
+	fmt.Printf("%s╰%s╯%s\n", ui.Blue, strings.Repeat("─", menuInnerWidth), ui.Reset)
 }
 
 func statusDashboard() {

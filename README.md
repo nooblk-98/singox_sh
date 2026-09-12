@@ -45,15 +45,23 @@ singbox-menu
 ```
 
 ```
-=== singox_sh manager ===
- 1) Refresh                     7) Set public address/domain for links
- 2) List inbounds               8) Kernel/network tuning
- 3) Add inbound                 9) View logs
- 4) Remove inbound             10) Backup config+certs now
- 5) List saved client links    11) Restart service
- 6) Certificates               12) Live traffic totals
-                               13) Uninstall
-                               14) Update singox_sh
+╭─ singox_sh manager (v2.2.0) ───────────────────────────────────╮
+│                                                                │
+│ INBOUNDS                        CERTS & NETWORK                │
+│  2) List inbounds                6) Certificates               │
+│  3) Add inbound                  7) Set public address/domain  │
+│  4) Remove inbound               8) Kernel/network tuning      │
+│  5) List saved client links                                    │
+│                                                                │
+│ OPERATIONS                      TOOL                           │
+│  9) View logs                   13) Uninstall                  │
+│ 10) Backup config+certs now     14) Update singox_sh           │
+│ 11) Restart service                                            │
+│ 12) Live traffic totals                                        │
+│                                                                │
+│  1) Refresh                      0) Exit                       │
+│                                                                │
+╰────────────────────────────────────────────────────────────────╯
 ```
 
 Adding an inbound just asks for a protocol and a port — keys, passwords, and the certificate are
